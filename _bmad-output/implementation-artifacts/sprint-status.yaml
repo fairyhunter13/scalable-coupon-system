@@ -84,7 +84,7 @@ development_status:
   6-2-database-resilience-testing: done
   6-3-input-boundary-testing: review
   6-4-transaction-edge-cases: review
-  6-5-mixed-load-and-chaos-testing: review
+  6-5-mixed-load-and-chaos-testing: done
   epic-6-retrospective: optional
 
   # Epic 7: CI/CD Enhancements & Visibility

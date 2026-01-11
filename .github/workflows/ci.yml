@@ -142,7 +142,7 @@ jobs:
   # ===========================================================================
   # STAGE 2: Database Tests (Parallel, Docker-Compose Required)
   # These jobs only run after ALL Stage 1 jobs pass.
-  # All tests in /tests/ use docker-compose to run against the real server.
+  # All tests in /tests/ use docker compose to run against the real server.
   # ===========================================================================
 
   integration-tests:
@@ -160,9 +160,9 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Start services with docker-compose
+      - name: Start services with docker compose
         run: |
-          docker-compose up -d --build
+          docker compose up -d --build
           echo "Waiting for services to be healthy..."
 
       - name: Wait for API to be healthy
@@ -176,13 +176,13 @@ jobs:
           TEST_DB_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
         run: go test -v -race -tags integration ./tests/integration/...
 
-      - name: Collect docker-compose logs on failure
+      - name: Collect docker compose logs on failure
         if: failure()
-        run: docker-compose logs
+        run: docker compose logs
 
       - name: Stop services
         if: always()
-        run: docker-compose down -v
+        run: docker compose down -v
 
   stress-tests:
     name: Stress Tests
@@ -199,9 +199,9 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Start services with docker-compose
+      - name: Start services with docker compose
         run: |
-          docker-compose up -d --build
+          docker compose up -d --build
           echo "Waiting for services to be healthy..."
 
       - name: Wait for API to be healthy
@@ -216,13 +216,13 @@ jobs:
         run: go test -v -race -tags stress -count=1 ./tests/stress/...
         timeout-minutes: 5
 
-      - name: Collect docker-compose logs on failure
+      - name: Collect docker compose logs on failure
         if: failure()
-        run: docker-compose logs
+        run: docker compose logs
 
       - name: Stop services
         if: always()
-        run: docker-compose down -v
+        run: docker compose down -v
 
   chaos-tests:
     name: Chaos Tests
@@ -239,9 +239,9 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Start services with docker-compose
+      - name: Start services with docker compose
         run: |
-          docker-compose up -d --build
+          docker compose up -d --build
           echo "Waiting for services to be healthy..."
 
       - name: Wait for API to be healthy
@@ -256,10 +256,10 @@ jobs:
         run: go test -v -race -tags chaos -count=1 ./tests/chaos/...
         timeout-minutes: 10
 
-      - name: Collect docker-compose logs on failure
+      - name: Collect docker compose logs on failure
         if: failure()
-        run: docker-compose logs
+        run: docker compose logs
 
       - name: Stop services
         if: always()
-        run: docker-compose down -v
+        run: docker compose down -v

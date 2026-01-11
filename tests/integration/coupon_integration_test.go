@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,6 +18,7 @@ import (
 	"github.com/fairyhunter13/scalable-coupon-system/internal/handler"
 	"github.com/fairyhunter13/scalable-coupon-system/internal/repository"
 	"github.com/fairyhunter13/scalable-coupon-system/internal/service"
+	"github.com/fairyhunter13/scalable-coupon-system/internal/validator"
 )
 
 func setupTestApp(t *testing.T) *fiber.App {
@@ -26,13 +26,13 @@ func setupTestApp(t *testing.T) *fiber.App {
 	cleanupTables(t)
 
 	app := fiber.New()
-	validate := validator.New()
+	v := validator.New() // Uses shared validator with custom validations (notblank)
 
 	couponRepo := repository.NewCouponRepository(testPool)
 	claimRepo := repository.NewClaimRepository(testPool)
 	couponService := service.NewCouponService(testPool, couponRepo, claimRepo)
-	couponHandler := handler.NewCouponHandler(couponService, validate)
-	claimHandler := handler.NewClaimHandler(couponService, validate)
+	couponHandler := handler.NewCouponHandler(couponService, v)
+	claimHandler := handler.NewClaimHandler(couponService, v)
 
 	app.Post("/api/coupons", couponHandler.CreateCoupon)
 	app.Get("/api/coupons/:name", couponHandler.GetCoupon)

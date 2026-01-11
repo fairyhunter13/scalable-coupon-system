@@ -52,6 +52,7 @@ func TestClaimCoupon_Success(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode, "Expected 200 OK")
 
@@ -74,6 +75,7 @@ func TestClaimCoupon_DuplicateClaim(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusConflict, resp.StatusCode, "Expected 409 Conflict")
 
@@ -97,6 +99,7 @@ func TestClaimCoupon_OutOfStock(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request")
 
@@ -120,6 +123,7 @@ func TestClaimCoupon_CouponNotFound(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode, "Expected 404 Not Found")
 
@@ -139,6 +143,7 @@ func TestClaimCoupon_MissingUserID(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request")
 
@@ -158,6 +163,7 @@ func TestClaimCoupon_MissingCouponName(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request")
 
@@ -177,6 +183,7 @@ func TestClaimCoupon_MalformedJSON(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 
@@ -200,6 +207,7 @@ func TestClaimCoupon_InternalServerError(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
 
@@ -219,6 +227,7 @@ func TestClaimCoupon_EmptyBody(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode)
 
@@ -247,6 +256,7 @@ func TestClaimCoupon_RequestFieldsSnakeCase(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 	assert.Equal(t, "user_001", capturedUserID, "user_id should be captured correctly")
@@ -271,6 +281,7 @@ func TestClaimCoupon_UnicodeUserID(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 	assert.Equal(t, "用户_001_🎉", capturedUserID, "Unicode user_id should be preserved")
@@ -293,6 +304,7 @@ func TestClaimCoupon_SpecialCharactersInCouponName(t *testing.T) {
 
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 	assert.Equal(t, "PROMO-100%_OFF!", capturedCouponName, "Special characters should be preserved")

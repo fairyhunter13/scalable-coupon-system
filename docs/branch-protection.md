@@ -44,7 +44,7 @@ You can also configure branch protection using the `gh` CLI:
 # Enable branch protection with required status checks
 gh api \
   --method PUT \
-  /repos/{owner}/{repo}/branches/main/protection \
+  /repos/fairyhunter13/scalable-coupon-system/branches/main/protection \
   -f "required_status_checks[strict]=true" \
   -f "required_status_checks[contexts][]=Build" \
   -f "required_status_checks[contexts][]=Test" \
@@ -55,18 +55,16 @@ gh api \
   -f "restrictions=null"
 ```
 
-**Note**: Replace `{owner}/{repo}` with your actual repository path (e.g., `fairyhunter13/scalable-coupon-system`).
-
 ### View Current Protection Rules
 
 ```bash
-gh api /repos/{owner}/{repo}/branches/main/protection
+gh api /repos/fairyhunter13/scalable-coupon-system/branches/main/protection
 ```
 
 ### Remove Protection Rules (if needed)
 
 ```bash
-gh api --method DELETE /repos/{owner}/{repo}/branches/main/protection
+gh api --method DELETE /repos/fairyhunter13/scalable-coupon-system/branches/main/protection
 ```
 
 ## Verification

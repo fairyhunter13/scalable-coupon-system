@@ -554,3 +554,4 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 | 2026-01-11 | Story 6.4 implementation complete - All transaction edge case tests implemented |
 | 2026-01-11 | Code review: Fixed 2 HIGH, 1 MEDIUM, 1 LOW issues. Test file staged for commit. |
 | 2026-01-11 | CI verified: All 10 tests passed, coverage 95.7%. Status → done |
+| 2026-01-11 | Follow-up review: Fixed sprint-status.yaml sync (was "review", now "done") |

@@ -16,6 +16,9 @@ func TestLoad_CustomValues(t *testing.T) {
 	t.Setenv("DB_USER", "myuser")
 	t.Setenv("DB_PASSWORD", "secret123")
 	t.Setenv("DB_NAME", "mydb")
+	t.Setenv("DB_SSLMODE", "require")
+	t.Setenv("DB_MAX_CONNS", "50")
+	t.Setenv("DB_MIN_CONNS", "10")
 	t.Setenv("LOG_LEVEL", "debug")
 	t.Setenv("LOG_PRETTY", "true")
 
@@ -33,6 +36,9 @@ func TestLoad_CustomValues(t *testing.T) {
 	assert.Equal(t, "myuser", cfg.DB.User)
 	assert.Equal(t, "secret123", cfg.DB.Password)
 	assert.Equal(t, "mydb", cfg.DB.Name)
+	assert.Equal(t, "require", cfg.DB.SSLMode)
+	assert.Equal(t, 50, cfg.DB.MaxConns)
+	assert.Equal(t, 10, cfg.DB.MinConns)
 
 	// Log custom values
 	assert.Equal(t, "debug", cfg.Log.Level)
@@ -56,6 +62,9 @@ func TestLoad_PartialOverride(t *testing.T) {
 	assert.Equal(t, 30, cfg.Server.ShutdownTimeout)
 	assert.Equal(t, "localhost", cfg.DB.Host)
 	assert.Equal(t, 5432, cfg.DB.Port)
+	assert.Equal(t, "disable", cfg.DB.SSLMode)
+	assert.Equal(t, 25, cfg.DB.MaxConns)
+	assert.Equal(t, 5, cfg.DB.MinConns)
 	assert.Equal(t, "info", cfg.Log.Level)
 }
 
@@ -66,9 +75,12 @@ func TestDBConfig_DSN(t *testing.T) {
 		User:     "postgres",
 		Password: "mypassword",
 		Name:     "testdb",
+		SSLMode:  "disable",
+		MaxConns: 25,
+		MinConns: 5,
 	}
 
-	expected := "postgres://postgres:mypassword@localhost:5432/testdb?sslmode=disable"
+	expected := "postgres://postgres:mypassword@localhost:5432/testdb?sslmode=disable&pool_max_conns=25&pool_min_conns=5"
 	assert.Equal(t, expected, dbCfg.DSN())
 }
 
@@ -79,13 +91,18 @@ func TestDBConfig_DSN_CustomPort(t *testing.T) {
 		User:     "admin",
 		Password: "secret",
 		Name:     "production_db",
+		SSLMode:  "require",
+		MaxConns: 50,
+		MinConns: 10,
 	}
 
 	dsn := dbCfg.DSN()
 	assert.Contains(t, dsn, "admin:secret")
 	assert.Contains(t, dsn, "db.example.com:5433")
 	assert.Contains(t, dsn, "production_db")
-	assert.Contains(t, dsn, "sslmode=disable")
+	assert.Contains(t, dsn, "sslmode=require")
+	assert.Contains(t, dsn, "pool_max_conns=50")
+	assert.Contains(t, dsn, "pool_min_conns=10")
 }
 
 // TestLoad_DefaultValues verifies all default values when no environment variables are set.
@@ -102,8 +119,11 @@ func TestLoad_DefaultValues(t *testing.T) {
 	// - DB_HOST: "localhost"
 	// - DB_PORT: 5432
 	// - DB_USER: "postgres"
-	// - DB_PASSWORD: "postgres"
+	// - DB_PASSWORD: "postgres" (WARNING: Change in production!)
 	// - DB_NAME: "coupon_db"
+	// - DB_SSLMODE: "disable" (Use "require" in production!)
+	// - DB_MAX_CONNS: 25
+	// - DB_MIN_CONNS: 5
 	// - LOG_LEVEL: "info"
 	// - LOG_PRETTY: false
 	//

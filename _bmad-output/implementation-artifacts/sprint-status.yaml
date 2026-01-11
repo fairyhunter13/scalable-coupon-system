@@ -80,7 +80,7 @@ development_status:
 
   # Epic 6: Advanced Testing & Chaos Engineering
   epic-6: in-progress
-  6-1-scale-stress-tests: review
+  6-1-scale-stress-tests: done
   6-2-database-resilience-testing: done
   6-3-input-boundary-testing: review
   6-4-transaction-edge-cases: review

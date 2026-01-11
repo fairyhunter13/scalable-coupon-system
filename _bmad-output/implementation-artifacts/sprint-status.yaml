@@ -86,7 +86,7 @@ development_status:
   6-4-transaction-edge-cases: done
   6-5-mixed-load-and-chaos-testing: done
   6-6-restructure-ci-pipeline-with-staged-quality-gates: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
 
   # Epic 7: CI/CD Enhancements & Visibility
   epic-7: backlog

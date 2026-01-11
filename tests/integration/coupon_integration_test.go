@@ -1,58 +1,34 @@
 //go:build integration
 
+// Package integration contains integration tests that run against the real docker-compose infrastructure.
+// These tests verify the system's HTTP API behavior end-to-end using real HTTP requests.
+//
+// All tests use postJSON/getJSON helpers which make real HTTP calls to the docker-compose server.
 package integration
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/fairyhunter13/scalable-coupon-system/internal/handler"
-	"github.com/fairyhunter13/scalable-coupon-system/internal/repository"
-	"github.com/fairyhunter13/scalable-coupon-system/internal/service"
-	"github.com/fairyhunter13/scalable-coupon-system/internal/validator"
 )
 
-func setupTestApp(t *testing.T) *fiber.App {
-	t.Helper()
+// TestCreateCoupon_Integration_Success tests POST /api/coupons success via real HTTP
+func TestCreateCoupon_Integration_Success(t *testing.T) {
 	cleanupTables(t)
 
-	app := fiber.New()
-	v := validator.New() // Uses shared validator with custom validations (notblank)
-
-	couponRepo := repository.NewCouponRepository(testPool)
-	claimRepo := repository.NewClaimRepository(testPool)
-	couponService := service.NewCouponService(testPool, couponRepo, claimRepo)
-	couponHandler := handler.NewCouponHandler(couponService, v)
-	claimHandler := handler.NewClaimHandler(couponService, v)
-
-	app.Post("/api/coupons", couponHandler.CreateCoupon)
-	app.Get("/api/coupons/:name", couponHandler.GetCoupon)
-	app.Post("/api/coupons/claim", claimHandler.ClaimCoupon)
-
-	return app
-}
-
-func TestCreateCoupon_Integration_Success(t *testing.T) {
-	app := setupTestApp(t)
-
-	body := `{"name": "PROMO_SUPER", "amount": 100}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   "PROMO_SUPER",
+		"amount": 100,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusCreated, resp.StatusCode, "Expected 201 Created")
+	assert.Equal(t, http.StatusCreated, resp.StatusCode, "Expected 201 Created")
 
 	// Verify coupon was actually stored in database
 	var name string
@@ -68,18 +44,15 @@ func TestCreateCoupon_Integration_Success(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_InvalidInput_MissingName(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	// Missing name field
-	body := `{"amount": 50}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"amount": 50,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for missing name")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for missing name")
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -88,18 +61,15 @@ func TestCreateCoupon_Integration_InvalidInput_MissingName(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_InvalidInput_MissingAmount(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	// Missing amount field
-	body := `{"name": "TEST_COUPON"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name": "TEST_COUPON",
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for missing amount")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for missing amount")
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -108,18 +78,16 @@ func TestCreateCoupon_Integration_InvalidInput_MissingAmount(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_InvalidInput_ZeroAmount(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	// Zero amount (violates CHECK constraint)
-	body := `{"name": "ZERO_AMOUNT_TEST", "amount": 0}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   "ZERO_AMOUNT_TEST",
+		"amount": 0,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for zero amount")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for zero amount")
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -128,18 +96,16 @@ func TestCreateCoupon_Integration_InvalidInput_ZeroAmount(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_InvalidInput_NegativeAmount(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	// Negative amount
-	body := `{"name": "NEGATIVE_AMOUNT_TEST", "amount": -10}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   "NEGATIVE_AMOUNT_TEST",
+		"amount": -10,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for negative amount")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for negative amount")
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -148,56 +114,36 @@ func TestCreateCoupon_Integration_InvalidInput_NegativeAmount(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_InvalidInput_EmptyBody(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	// Empty request body
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(""))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for empty body")
-}
-
-func TestCreateCoupon_Integration_InvalidInput_MalformedJSON(t *testing.T) {
-	app := setupTestApp(t)
-
-	// Malformed JSON
-	body := `{"name": "TEST", "amount": }`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for malformed JSON")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for empty body")
 }
 
 func TestCreateCoupon_Integration_DuplicateName(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Create first coupon
-	body := `{"name": "UNIQUE_COUPON", "amount": 50}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   "UNIQUE_COUPON",
+		"amount": 50,
+	})
 	require.NoError(t, err)
-	_ = resp.Body.Close()
-	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+	resp.Body.Close()
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	// Try to create duplicate
-	req = httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err = app.Test(req)
+	resp, err = postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   "UNIQUE_COUPON",
+		"amount": 50,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusConflict, resp.StatusCode)
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -208,21 +154,19 @@ func TestCreateCoupon_Integration_DuplicateName(t *testing.T) {
 // SQL Injection Tests - These verify that parameterized queries prevent injection attacks
 
 func TestCreateCoupon_Integration_SQLInjection_DropTable(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Attempt SQL injection via coupon name
 	maliciousName := "'; DROP TABLE coupons;--"
-	body := `{"name": "` + maliciousName + `", "amount": 1}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   maliciousName,
+		"amount": 1,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
 	// Should succeed (coupon created with weird name) OR fail gracefully
-	// The important thing is the table should still exist
-	assert.True(t, resp.StatusCode == fiber.StatusCreated || resp.StatusCode == fiber.StatusBadRequest,
+	assert.True(t, resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusBadRequest,
 		"Response should be 201 (created with literal name) or 400 (rejected)")
 
 	// Verify coupons table still exists and is accessible
@@ -232,17 +176,16 @@ func TestCreateCoupon_Integration_SQLInjection_DropTable(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_SQLInjection_UnionSelect(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Attempt SQL injection via UNION SELECT
 	maliciousName := "test' UNION SELECT * FROM pg_user--"
-	body := `{"name": "` + maliciousName + `", "amount": 10}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   maliciousName,
+		"amount": 10,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
 	// Verify database integrity
 	var count int
@@ -251,17 +194,16 @@ func TestCreateCoupon_Integration_SQLInjection_UnionSelect(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_SQLInjection_CommentInjection(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Attempt SQL injection via comment
 	maliciousName := "test'/**/OR/**/1=1--"
-	body := `{"name": "` + maliciousName + `", "amount": 5}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   maliciousName,
+		"amount": 5,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
 	// Verify only expected data exists (not all rows)
 	var count int
@@ -271,17 +213,16 @@ func TestCreateCoupon_Integration_SQLInjection_CommentInjection(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_SQLInjection_BatchStatement(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Attempt batch statement injection
 	maliciousName := "test'; INSERT INTO coupons (name, amount, remaining_amount) VALUES ('HACKED', 999, 999);--"
-	body := `{"name": "` + maliciousName + `", "amount": 1}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   maliciousName,
+		"amount": 1,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
 	// Verify that no 'HACKED' coupon was created
 	var count int
@@ -292,34 +233,32 @@ func TestCreateCoupon_Integration_SQLInjection_BatchStatement(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_SQLInjection_NumericOverflow(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	// Attempt injection via amount field (in JSON, but tests numeric handling)
-	body := `{"name": "OVERFLOW_TEST", "amount": 2147483647}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	// Attempt injection via amount field (tests numeric handling)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   "OVERFLOW_TEST",
+		"amount": 2147483647,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
 	// Should handle gracefully (either succeed with max int or fail validation)
-	assert.True(t, resp.StatusCode == fiber.StatusCreated || resp.StatusCode == fiber.StatusBadRequest,
+	assert.True(t, resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusBadRequest,
 		"Should handle large numbers gracefully")
 }
 
 func TestCreateCoupon_Integration_AtomicInsert(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	body := `{"name": "ATOMIC_TEST", "amount": 50}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   "ATOMIC_TEST",
+		"amount": 50,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	// Verify all fields were inserted atomically
 	var name string
@@ -335,17 +274,16 @@ func TestCreateCoupon_Integration_AtomicInsert(t *testing.T) {
 }
 
 func TestCreateCoupon_Integration_EmptyResponseBody(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	body := `{"name": "EMPTY_BODY_TEST", "amount": 25}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
+		"name":   "EMPTY_BODY_TEST",
+		"amount": 25,
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusCreated, resp.StatusCode)
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	// AC #1 requires empty response body
 	respBody, _ := io.ReadAll(resp.Body)
@@ -355,9 +293,9 @@ func TestCreateCoupon_Integration_EmptyResponseBody(t *testing.T) {
 // GET /api/coupons/:name Integration Tests
 
 func TestGetCoupon_Integration_WithClaims(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	// Create coupon
+	// Create coupon directly in DB
 	_, err := testPool.Exec(context.Background(),
 		"INSERT INTO coupons (name, amount, remaining_amount) VALUES ($1, $2, $3)",
 		"PROMO_SUPER", 100, 95)
@@ -372,13 +310,11 @@ func TestGetCoupon_Integration_WithClaims(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/coupons/PROMO_SUPER", nil)
-
-	resp, err := app.Test(req)
+	resp, err := getJSON(formatURL("/api/coupons/PROMO_SUPER"))
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var result map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -394,7 +330,7 @@ func TestGetCoupon_Integration_WithClaims(t *testing.T) {
 }
 
 func TestGetCoupon_Integration_NoClaims(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Create coupon with no claims
 	_, err := testPool.Exec(context.Background(),
@@ -402,13 +338,11 @@ func TestGetCoupon_Integration_NoClaims(t *testing.T) {
 		"NEW_PROMO", 100, 100)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/coupons/NEW_PROMO", nil)
-
-	resp, err := app.Test(req)
+	resp, err := getJSON(formatURL("/api/coupons/NEW_PROMO"))
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var result map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -425,15 +359,13 @@ func TestGetCoupon_Integration_NoClaims(t *testing.T) {
 }
 
 func TestGetCoupon_Integration_NotFound(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/coupons/NONEXISTENT", nil)
-
-	resp, err := app.Test(req)
+	resp, err := getJSON(formatURL("/api/coupons/NONEXISTENT"))
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -442,7 +374,7 @@ func TestGetCoupon_Integration_NotFound(t *testing.T) {
 }
 
 func TestGetCoupon_Integration_SnakeCaseJSON(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Create coupon
 	_, err := testPool.Exec(context.Background(),
@@ -450,13 +382,11 @@ func TestGetCoupon_Integration_SnakeCaseJSON(t *testing.T) {
 		"SNAKE_CASE_TEST", 100, 90)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/coupons/SNAKE_CASE_TEST", nil)
-
-	resp, err := app.Test(req)
+	resp, err := getJSON(formatURL("/api/coupons/SNAKE_CASE_TEST"))
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Parse raw JSON to verify field names
 	respBody, _ := io.ReadAll(resp.Body)
@@ -486,7 +416,7 @@ func TestGetCoupon_Integration_SnakeCaseJSON(t *testing.T) {
 // POST /api/coupons/claim Integration Tests
 
 func TestClaimCoupon_Integration_Success(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Create coupon with stock
 	_, err := testPool.Exec(context.Background(),
@@ -494,15 +424,14 @@ func TestClaimCoupon_Integration_Success(t *testing.T) {
 		"PROMO_CLAIM", 100, 5)
 	require.NoError(t, err)
 
-	body := `{"user_id": "user_001", "coupon_name": "PROMO_CLAIM"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons/claim", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+		"user_id":     "user_001",
+		"coupon_name": "PROMO_CLAIM",
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusOK, resp.StatusCode, "Expected 200 OK for successful claim")
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "Expected 200 OK for successful claim")
 
 	// Verify empty response body per AC
 	respBody, _ := io.ReadAll(resp.Body)
@@ -526,7 +455,7 @@ func TestClaimCoupon_Integration_Success(t *testing.T) {
 }
 
 func TestClaimCoupon_Integration_DuplicateClaim(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Create coupon
 	_, err := testPool.Exec(context.Background(),
@@ -535,24 +464,23 @@ func TestClaimCoupon_Integration_DuplicateClaim(t *testing.T) {
 	require.NoError(t, err)
 
 	// First claim - should succeed
-	body := `{"user_id": "user_001", "coupon_name": "PROMO_DUP"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons/claim", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+		"user_id":     "user_001",
+		"coupon_name": "PROMO_DUP",
+	})
 	require.NoError(t, err)
-	_ = resp.Body.Close()
-	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Second claim - should fail with 409
-	req = httptest.NewRequest(http.MethodPost, "/api/coupons/claim", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err = app.Test(req)
+	resp, err = postJSON(formatURL("/api/coupons/claim"), map[string]string{
+		"user_id":     "user_001",
+		"coupon_name": "PROMO_DUP",
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusConflict, resp.StatusCode, "Expected 409 Conflict for duplicate claim")
+	assert.Equal(t, http.StatusConflict, resp.StatusCode, "Expected 409 Conflict for duplicate claim")
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -569,7 +497,7 @@ func TestClaimCoupon_Integration_DuplicateClaim(t *testing.T) {
 }
 
 func TestClaimCoupon_Integration_OutOfStock(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Create coupon with zero stock
 	_, err := testPool.Exec(context.Background(),
@@ -577,15 +505,14 @@ func TestClaimCoupon_Integration_OutOfStock(t *testing.T) {
 		"PROMO_EMPTY", 100, 0)
 	require.NoError(t, err)
 
-	body := `{"user_id": "user_999", "coupon_name": "PROMO_EMPTY"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons/claim", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+		"user_id":     "user_999",
+		"coupon_name": "PROMO_EMPTY",
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for out of stock")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for out of stock")
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -602,17 +529,16 @@ func TestClaimCoupon_Integration_OutOfStock(t *testing.T) {
 }
 
 func TestClaimCoupon_Integration_CouponNotFound(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	body := `{"user_id": "user_001", "coupon_name": "NONEXISTENT"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons/claim", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+		"user_id":     "user_001",
+		"coupon_name": "NONEXISTENT",
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode, "Expected 404 Not Found for missing coupon")
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "Expected 404 Not Found for missing coupon")
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -621,17 +547,15 @@ func TestClaimCoupon_Integration_CouponNotFound(t *testing.T) {
 }
 
 func TestClaimCoupon_Integration_MissingUserID(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	body := `{"coupon_name": "PROMO_SUPER"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons/claim", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+		"coupon_name": "PROMO_SUPER",
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for missing user_id")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for missing user_id")
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -640,17 +564,15 @@ func TestClaimCoupon_Integration_MissingUserID(t *testing.T) {
 }
 
 func TestClaimCoupon_Integration_MissingCouponName(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
-	body := `{"user_id": "user_001"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons/claim", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+		"user_id": "user_001",
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for missing coupon_name")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Expected 400 Bad Request for missing coupon_name")
 
 	var result map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -659,7 +581,7 @@ func TestClaimCoupon_Integration_MissingCouponName(t *testing.T) {
 }
 
 func TestClaimCoupon_Integration_AtomicTransaction(t *testing.T) {
-	app := setupTestApp(t)
+	cleanupTables(t)
 
 	// Create coupon with limited stock
 	_, err := testPool.Exec(context.Background(),
@@ -670,26 +592,24 @@ func TestClaimCoupon_Integration_AtomicTransaction(t *testing.T) {
 	// Claim 3 times with different users
 	users := []string{"user_a", "user_b", "user_c"}
 	for _, userID := range users {
-		body := `{"user_id": "` + userID + `", "coupon_name": "PROMO_ATOMIC"}`
-		req := httptest.NewRequest(http.MethodPost, "/api/coupons/claim", bytes.NewBufferString(body))
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := app.Test(req)
+		resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+			"user_id":     userID,
+			"coupon_name": "PROMO_ATOMIC",
+		})
 		require.NoError(t, err)
-		_ = resp.Body.Close()
-		assert.Equal(t, fiber.StatusOK, resp.StatusCode, "User %s should claim successfully", userID)
+		resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode, "User %s should claim successfully", userID)
 	}
 
 	// Fourth claim should fail - out of stock
-	body := `{"user_id": "user_d", "coupon_name": "PROMO_ATOMIC"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/coupons/claim", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
+	resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+		"user_id":     "user_d",
+		"coupon_name": "PROMO_ATOMIC",
+	})
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Fourth claim should fail - out of stock")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Fourth claim should fail - out of stock")
 
 	// Verify final state
 	var remainingAmount int

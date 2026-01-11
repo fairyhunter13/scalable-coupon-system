@@ -34,14 +34,33 @@ func formatClaimValidationError(err error) string {
 	if errors.As(err, &ve) {
 		for _, fe := range ve {
 			field := fe.Field()
+			tag := fe.Tag()
 
 			switch field {
 			case "UserID":
-				return "invalid request: user_id is required"
+				if tag == "required" {
+					return "invalid request: user_id is required"
+				}
+				if tag == "max" {
+					return "invalid request: user_id exceeds maximum length of 255"
+				}
+				return "invalid request: user_id is invalid"
 			case "CouponName":
-				return "invalid request: coupon_name is required"
+				if tag == "required" {
+					return "invalid request: coupon_name is required"
+				}
+				if tag == "max" {
+					return "invalid request: coupon_name exceeds maximum length of 255"
+				}
+				return "invalid request: coupon_name is invalid"
 			default:
-				return "invalid request: " + field + " is required"
+				if tag == "required" {
+					return "invalid request: " + field + " is required"
+				}
+				if tag == "max" {
+					return "invalid request: " + field + " exceeds maximum length"
+				}
+				return "invalid request: " + field + " is invalid"
 			}
 		}
 	}

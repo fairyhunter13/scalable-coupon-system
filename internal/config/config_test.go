@@ -164,6 +164,48 @@ func TestConfig_Validate(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "DB_SSLMODE must be one of")
 	})
+
+	t.Run("invalid_shutdown_timeout_too_high", func(t *testing.T) {
+		t.Setenv("SHUTDOWN_TIMEOUT", "301")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SHUTDOWN_TIMEOUT must not exceed 300 seconds")
+	})
+
+	t.Run("invalid_db_port_zero", func(t *testing.T) {
+		t.Setenv("DB_PORT", "0")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DB_PORT must be between 1 and 65535")
+	})
+
+	t.Run("invalid_db_port_too_high", func(t *testing.T) {
+		t.Setenv("DB_PORT", "65536")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DB_PORT must be between 1 and 65535")
+	})
+
+	t.Run("invalid_db_host_empty", func(t *testing.T) {
+		t.Setenv("DB_HOST", "")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DB_HOST cannot be empty")
+	})
+
+	t.Run("invalid_db_user_empty", func(t *testing.T) {
+		t.Setenv("DB_USER", "")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DB_USER cannot be empty")
+	})
+
+	t.Run("invalid_db_name_empty", func(t *testing.T) {
+		t.Setenv("DB_NAME", "")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DB_NAME cannot be empty")
+	})
 }
 
 // TestConfig_Validate_ValidSSLModes tests all valid SSL modes.

@@ -70,9 +70,23 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("SERVER_PORT must be between 1 and 65535, got %d", port)
 	}
 
-	// Validate shutdown timeout
+	// Validate shutdown timeout (1-300 seconds, 5 min max)
 	if c.Server.ShutdownTimeout < 1 {
 		return fmt.Errorf("SHUTDOWN_TIMEOUT must be at least 1 second, got %d", c.Server.ShutdownTimeout)
+	}
+	if c.Server.ShutdownTimeout > 300 {
+		return fmt.Errorf("SHUTDOWN_TIMEOUT must not exceed 300 seconds, got %d", c.Server.ShutdownTimeout)
+	}
+
+	// Validate required string fields
+	if c.DB.Host == "" {
+		return fmt.Errorf("DB_HOST cannot be empty")
+	}
+	if c.DB.User == "" {
+		return fmt.Errorf("DB_USER cannot be empty")
+	}
+	if c.DB.Name == "" {
+		return fmt.Errorf("DB_NAME cannot be empty")
 	}
 
 	// Validate DB port

@@ -40,7 +40,13 @@ func formatValidationError(err error) string {
 
 			switch field {
 			case "Name":
-				return "invalid request: name is required"
+				if tag == "required" {
+					return "invalid request: name is required"
+				}
+				if tag == "max" {
+					return "invalid request: name exceeds maximum length of 255"
+				}
+				return "invalid request: name is invalid"
 			case "Amount":
 				if tag == "required" {
 					return "invalid request: amount is required"
@@ -54,6 +60,9 @@ func formatValidationError(err error) string {
 				// Defensive: handle unknown fields with descriptive message
 				if tag == "required" {
 					return "invalid request: " + field + " is required"
+				}
+				if tag == "max" {
+					return "invalid request: " + field + " exceeds maximum length"
 				}
 				return "invalid request: " + field + " is invalid"
 			}

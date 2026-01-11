@@ -41,6 +41,9 @@ func formatClaimValidationError(err error) string {
 				if tag == "required" {
 					return "invalid request: user_id is required"
 				}
+				if tag == "notblank" {
+					return "invalid request: user_id cannot be whitespace only"
+				}
 				if tag == "max" {
 					return "invalid request: user_id exceeds maximum length of 255"
 				}
@@ -49,6 +52,9 @@ func formatClaimValidationError(err error) string {
 				if tag == "required" {
 					return "invalid request: coupon_name is required"
 				}
+				if tag == "notblank" {
+					return "invalid request: coupon_name cannot be whitespace only"
+				}
 				if tag == "max" {
 					return "invalid request: coupon_name exceeds maximum length of 255"
 				}
@@ -56,6 +62,9 @@ func formatClaimValidationError(err error) string {
 			default:
 				if tag == "required" {
 					return "invalid request: " + field + " is required"
+				}
+				if tag == "notblank" {
+					return "invalid request: " + field + " cannot be whitespace only"
 				}
 				if tag == "max" {
 					return "invalid request: " + field + " exceeds maximum length"

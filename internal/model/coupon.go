@@ -26,6 +26,6 @@ type CreateCouponRequest struct {
 
 // ClaimCouponRequest is the DTO for claiming a coupon
 type ClaimCouponRequest struct {
-	UserID     string `json:"user_id" validate:"required,max=255"`
-	CouponName string `json:"coupon_name" validate:"required,max=255"`
+	UserID     string `json:"user_id" validate:"required,notblank,max=255"`
+	CouponName string `json:"coupon_name" validate:"required,notblank,max=255"`
 }

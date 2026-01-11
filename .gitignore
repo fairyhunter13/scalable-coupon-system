@@ -32,4 +32,27 @@ go.work.sum
 # .vscode/
 
 # Project requirements
+# Decrypted locally from secrets/project-requirements/
 project_requirements/
+
+# SOPS AGE private keys (NEVER commit these!)
+.sops/
+*.age
+
+# Build artifacts
+bin/
+dist/
+/api
+
+# Coverage reports
+coverage/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

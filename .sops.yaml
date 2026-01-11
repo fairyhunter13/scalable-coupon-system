@@ -1,0 +1,26 @@
+# SOPS Configuration for scalable-coupon-system
+# Uses age encryption for secrets management
+#
+# Setup:
+# 1. Ensure age key exists: ~/.config/sops/age/keys.txt
+# 2. Run: make decrypt-requirements (to decrypt for local use)
+# 3. Run: make encrypt-requirements (before committing secrets/)
+
+creation_rules:
+  # Project requirements (original files with sensitive context)
+  - path_regex: project_requirements/.*
+    key_groups:
+      - age:
+          - "age1mxkhk7p4ngsl7yagkp0m2xa5ggzl2ppfgrfuadadsxdus8jcpugqsn9x5u"
+
+  # Encrypted secrets directory (for decryption)
+  - path_regex: secrets/.*\.sops
+    key_groups:
+      - age:
+          - "age1mxkhk7p4ngsl7yagkp0m2xa5ggzl2ppfgrfuadadsxdus8jcpugqsn9x5u"
+
+  # Default fallback rule
+  - path_regex: .*
+    key_groups:
+      - age:
+          - "age1mxkhk7p4ngsl7yagkp0m2xa5ggzl2ppfgrfuadadsxdus8jcpugqsn9x5u"

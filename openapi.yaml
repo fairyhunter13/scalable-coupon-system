@@ -1,0 +1,303 @@
+openapi: 3.0.3
+info:
+  title: Scalable Coupon System API
+  description: |
+    A Flash Sale Coupon System REST API demonstrating production-grade backend engineering.
+    Handles coupon creation, claiming, and status queries with guaranteed correctness
+    under high-concurrency scenarios.
+  version: 1.0.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: Coupons
+    description: Coupon management operations (create, retrieve)
+  - name: Claims
+    description: Coupon claim operations (atomic, concurrency-safe)
+
+# Security: Explicitly no authentication required (by design per architecture decision)
+security: []
+
+paths:
+  /api/coupons:
+    post:
+      summary: Create a new coupon
+      description: Creates a coupon with the specified name and stock amount
+      operationId: createCoupon
+      tags:
+        - Coupons
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCouponRequest'
+            examples:
+              standard:
+                summary: Standard coupon creation
+                value:
+                  name: "PROMO_SUPER"
+                  amount: 100
+      responses:
+        '201':
+          description: Coupon created successfully (empty response body)
+        '400':
+          description: Bad request - invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingName:
+                  summary: Missing name field
+                  value:
+                    error: "invalid request: name is required"
+                missingAmount:
+                  summary: Missing amount field
+                  value:
+                    error: "invalid request: amount is required"
+                invalidAmount:
+                  summary: Amount less than 1
+                  value:
+                    error: "invalid request: amount must be at least 1"
+        '409':
+          description: Conflict - coupon already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                duplicate:
+                  summary: Duplicate coupon name
+                  value:
+                    error: "coupon already exists"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                serverError:
+                  summary: Database or server failure
+                  value:
+                    error: "internal server error"
+
+  /api/coupons/claim:
+    post:
+      summary: Claim a coupon for a user
+      description: |
+        Attempts to claim a coupon for a specific user atomically.
+        The operation is concurrency-safe using database transactions with row locking.
+      operationId: claimCoupon
+      tags:
+        - Claims
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimCouponRequest'
+            examples:
+              standard:
+                summary: Standard claim request
+                value:
+                  user_id: "user_12345"
+                  coupon_name: "PROMO_SUPER"
+      responses:
+        '200':
+          description: Coupon claimed successfully (empty response body)
+        '400':
+          description: Bad request - invalid input or out of stock
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingUserId:
+                  summary: Missing user_id field
+                  value:
+                    error: "invalid request: user_id is required"
+                missingCouponName:
+                  summary: Missing coupon_name field
+                  value:
+                    error: "invalid request: coupon_name is required"
+                outOfStock:
+                  summary: Coupon out of stock
+                  value:
+                    error: "coupon out of stock"
+        '404':
+          description: Coupon not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  summary: Coupon does not exist
+                  value:
+                    error: "coupon not found"
+        '409':
+          description: Conflict - user already claimed this coupon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                alreadyClaimed:
+                  summary: Duplicate claim attempt
+                  value:
+                    error: "coupon already claimed by user"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                serverError:
+                  summary: Database or server failure
+                  value:
+                    error: "internal server error"
+
+  /api/coupons/{name}:
+    get:
+      summary: Get coupon details
+      description: Retrieves coupon details including who has claimed it
+      operationId: getCoupon
+      tags:
+        - Coupons
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The unique name of the coupon
+          schema:
+            type: string
+          example: "PROMO_SUPER"
+      responses:
+        '200':
+          description: Coupon details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouponResponse'
+              examples:
+                withClaims:
+                  summary: Coupon with claims
+                  value:
+                    name: "PROMO_SUPER"
+                    amount: 100
+                    remaining_amount: 95
+                    claimed_by: ["user_001", "user_002", "user_003", "user_004", "user_005"]
+                noClaims:
+                  summary: Coupon with no claims
+                  value:
+                    name: "NEW_PROMO"
+                    amount: 50
+                    remaining_amount: 50
+                    claimed_by: []
+        '404':
+          description: Coupon not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  summary: Coupon does not exist
+                  value:
+                    error: "coupon not found"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                serverError:
+                  summary: Database or server failure
+                  value:
+                    error: "internal server error"
+
+components:
+  schemas:
+    CreateCouponRequest:
+      type: object
+      description: Request body for creating a new coupon
+      required:
+        - name
+        - amount
+      properties:
+        name:
+          type: string
+          description: Unique name for the coupon
+          example: "PROMO_SUPER"
+        amount:
+          type: integer
+          format: int32
+          description: Initial stock amount (must be at least 1)
+          minimum: 1
+          example: 100
+
+    CouponResponse:
+      type: object
+      description: Response body for coupon details
+      required:
+        - name
+        - amount
+        - remaining_amount
+        - claimed_by
+      properties:
+        name:
+          type: string
+          description: The unique name of the coupon
+          example: "PROMO_SUPER"
+        amount:
+          type: integer
+          format: int32
+          description: Original stock amount
+          example: 100
+        remaining_amount:
+          type: integer
+          format: int32
+          description: Current remaining stock
+          example: 95
+        claimed_by:
+          type: array
+          description: List of user IDs who have claimed this coupon
+          items:
+            type: string
+          example: ["user_001", "user_002"]
+
+    ClaimCouponRequest:
+      type: object
+      description: Request body for claiming a coupon
+      required:
+        - user_id
+        - coupon_name
+      properties:
+        user_id:
+          type: string
+          description: Unique identifier of the user claiming the coupon
+          example: "user_12345"
+        coupon_name:
+          type: string
+          description: Name of the coupon to claim
+          example: "PROMO_SUPER"
+
+    ErrorResponse:
+      type: object
+      description: Standard error response format
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: "coupon not found"

@@ -19,3 +19,6 @@ CREATE TABLE claims (
 
 -- Index for efficient claim lookups by coupon
 CREATE INDEX idx_claims_coupon_name ON claims(coupon_name);
+
+-- Index for efficient claim lookups by user
+CREATE INDEX idx_claims_user_id ON claims(user_id);

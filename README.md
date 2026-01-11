@@ -21,7 +21,7 @@
 
 <!-- Project Info -->
 [![Go Reference](https://pkg.go.dev/badge/github.com/fairyhunter13/scalable-coupon-system.svg)](https://pkg.go.dev/github.com/fairyhunter13/scalable-coupon-system)
-[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![Go Version](https://img.shields.io/badge/Go-1.25.5-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A Flash Sale Coupon System REST API demonstrating production-grade Golang backend engineering with atomic claim processing under high concurrency.

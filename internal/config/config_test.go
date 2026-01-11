@@ -105,6 +105,81 @@ func TestDBConfig_DSN_CustomPort(t *testing.T) {
 	assert.Contains(t, dsn, "pool_min_conns=10")
 }
 
+// TestConfig_Validate tests the validation logic for configuration.
+func TestConfig_Validate(t *testing.T) {
+	// Each subtest runs in isolation with t.Setenv auto-cleanup
+	t.Run("invalid_server_port_not_number", func(t *testing.T) {
+		t.Setenv("SERVER_PORT", "abc")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SERVER_PORT must be a valid number")
+	})
+
+	t.Run("invalid_server_port_zero", func(t *testing.T) {
+		t.Setenv("SERVER_PORT", "0")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SERVER_PORT must be between 1 and 65535")
+	})
+
+	t.Run("invalid_server_port_too_high", func(t *testing.T) {
+		t.Setenv("SERVER_PORT", "65536")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SERVER_PORT must be between 1 and 65535")
+	})
+
+	t.Run("invalid_shutdown_timeout_zero", func(t *testing.T) {
+		t.Setenv("SHUTDOWN_TIMEOUT", "0")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "SHUTDOWN_TIMEOUT must be at least 1 second")
+	})
+
+	t.Run("invalid_db_max_conns_zero", func(t *testing.T) {
+		t.Setenv("DB_MAX_CONNS", "0")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DB_MAX_CONNS must be at least 1")
+	})
+
+	t.Run("invalid_db_min_conns_negative", func(t *testing.T) {
+		t.Setenv("DB_MIN_CONNS", "-1")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DB_MIN_CONNS must be at least 0")
+	})
+
+	t.Run("invalid_db_min_exceeds_max", func(t *testing.T) {
+		t.Setenv("DB_MAX_CONNS", "5")
+		t.Setenv("DB_MIN_CONNS", "10")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DB_MIN_CONNS (10) cannot exceed DB_MAX_CONNS (5)")
+	})
+
+	t.Run("invalid_ssl_mode", func(t *testing.T) {
+		t.Setenv("DB_SSLMODE", "invalid")
+		_, err := Load()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DB_SSLMODE must be one of")
+	})
+}
+
+// TestConfig_Validate_ValidSSLModes tests all valid SSL modes.
+func TestConfig_Validate_ValidSSLModes(t *testing.T) {
+	validModes := []string{"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}
+
+	for _, mode := range validModes {
+		t.Run(mode, func(t *testing.T) {
+			t.Setenv("DB_SSLMODE", mode)
+			cfg, err := Load()
+			require.NoError(t, err)
+			assert.Equal(t, mode, cfg.DB.SSLMode)
+		})
+	}
+}
+
 // TestLoad_DefaultValues verifies all default values when no environment variables are set.
 // This ensures the config layer works correctly with zero configuration.
 // Note: envconfig uses defaults when env vars are UNSET, not when set to empty string.

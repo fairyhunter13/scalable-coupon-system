@@ -70,10 +70,10 @@ development_status:
   epic-4-retrospective: done
 
   # Epic 5: CI/CD Pipeline & Production Readiness
-  epic-5: backlog
-  5-1-github-actions-ci-workflow: backlog
-  5-2-quality-gates-linting-and-static-analysis: backlog
-  5-3-security-scanning: backlog
-  5-4-ci-pipeline-integration-and-quality-gates: backlog
-  5-5-readme-status-badges: backlog
+  epic-5: in-progress
+  5-1-github-actions-ci-workflow: done
+  5-2-quality-gates-linting-and-static-analysis: in-progress
+  5-3-security-scanning: review
+  5-4-ci-pipeline-integration-and-quality-gates: in-progress
+  5-5-readme-status-badges: ready-for-dev
   epic-5-retrospective: optional

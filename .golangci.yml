@@ -1,0 +1,102 @@
+# golangci-lint configuration (v2 format)
+# See: https://golangci-lint.run/usage/configuration/
+
+version: "2"
+
+run:
+  # Timeout for analysis
+  timeout: 5m
+
+  # Exclude test files from analysis (they have different standards)
+  tests: false
+
+output:
+  # Output formats
+  formats:
+    text:
+      path: stdout
+      print-issued-lines: true
+      print-linter-name: true
+
+formatters:
+  enable:
+    - gofmt         # Check code formatting
+    - goimports     # Check import organization
+
+  settings:
+    goimports:
+      # Put local imports after 3rd-party packages
+      local-prefixes:
+        - github.com/fairyhunter13/scalable-coupon-system
+
+linters:
+  # Disable all default linters first
+  default: none
+
+  enable:
+    # Required by AC#2: Core recommended linters
+    - errcheck      # Check for unchecked errors
+    - govet         # Report suspicious constructs (required by NFR13)
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Static analysis checks (includes gosimple)
+    - unused        # Check for unused code
+
+    # Additional recommended linters (AC#2 Subtask 1.2)
+    - misspell      # Check for spelling errors in comments
+    - gocyclo       # Check cyclomatic complexity
+
+    # Extra quality linters
+    - bodyclose     # Check HTTP response body is closed
+    - nilerr        # Check for nil error returns
+    - unconvert     # Remove unnecessary type conversions
+
+  settings:
+    # Cyclomatic complexity threshold
+    gocyclo:
+      min-complexity: 15
+
+    # Error check settings
+    errcheck:
+      # Disable check for ignored errors with blank identifier (intentional ignores)
+      check-blank: false
+      # Check type assertions
+      check-type-assertions: false
+
+    # Go vet settings
+    govet:
+      # Enable all analyzers
+      enable-all: true
+      # Disable noisy analyzers
+      disable:
+        - shadow
+        - fieldalignment  # Struct field alignment optimization hints
+
+    # Misspell settings
+    misspell:
+      locale: US
+
+    # Staticcheck settings (includes gosimple checks)
+    staticcheck:
+      # Enable all checks except ST1000 (package comments not required)
+      checks:
+        - all
+        - -ST1000  # Package comments not required for this project
+
+  exclusions:
+    # Exclusion rules (v2 format)
+    rules:
+      # Exclude known issues in generated code
+      - path: ".*_gen\\.go"
+        linters:
+          - errcheck
+          - unused
+
+severity:
+  # Default severity for issues
+  default: error
+
+  # Per-linter severity rules
+  rules:
+    - linters:
+        - misspell
+      severity: warning

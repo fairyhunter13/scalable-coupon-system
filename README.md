@@ -1,5 +1,7 @@
 # Scalable Coupon System
 
+[![CI](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml)
+
 A Flash Sale Coupon System REST API demonstrating production-grade Golang backend engineering with atomic claim processing under high concurrency.
 
 ## Prerequisites
@@ -95,11 +97,13 @@ curl -X POST http://localhost:3000/api/coupons/claim \
 ### Available Make Commands
 
 ```bash
-make all           # Run fmt, lint, vet, test
+make all           # Run fmt, lint, vet, security, and test
 make deps          # Download Go dependencies
 make fmt           # Format code
 make lint          # Run linter (golangci-lint)
 make vet           # Run go vet
+make security      # Run security scans (gosec + govulncheck)
+make check         # Run all checks (lint + vet + security)
 make test          # Run tests with coverage
 make cover         # Generate coverage HTML report
 make build         # Build the application

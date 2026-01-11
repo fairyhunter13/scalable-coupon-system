@@ -1,4 +1,4 @@
-//go:build ci
+//go:build chaos
 
 // Package chaos contains CI-only chaos engineering tests for database resilience.
 // These tests verify the system handles database failure scenarios correctly:

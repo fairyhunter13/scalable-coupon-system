@@ -28,9 +28,9 @@ define check_file_exists
 endef
 
 .PHONY: all deps fmt lint vet test cover build docker-build docker-run \
-	encrypt-requirements decrypt-requirements help
+	encrypt-requirements decrypt-requirements help security check
 
-all: fmt lint vet test
+all: fmt lint vet security test
 
 # --- Development Targets ---
 
@@ -49,6 +49,14 @@ lint:
 
 vet:
 	$(GO) vet ./...
+
+security:
+	@which gosec >/dev/null 2>&1 || (echo "Installing gosec..." && go install github.com/securego/gosec/v2/cmd/gosec@latest)
+	@which govulncheck >/dev/null 2>&1 || (echo "Installing govulncheck..." && go install golang.org/x/vuln/cmd/govulncheck@latest)
+	gosec ./...
+	govulncheck ./...
+
+check: lint vet security
 
 test:
 	@mkdir -p $(COVERAGE_DIR)
@@ -123,9 +131,12 @@ help:
 	@echo "  make fmt               - Format code"
 	@echo "  make lint              - Run linter"
 	@echo "  make vet               - Run go vet"
+	@echo "  make security          - Run security scans (gosec + govulncheck)"
+	@echo "  make check             - Run all checks (lint + vet + security)"
 	@echo "  make test              - Run tests with coverage"
 	@echo "  make cover             - Generate coverage HTML report"
 	@echo "  make build             - Build the application"
+	@echo "  make all               - Run fmt, lint, vet, security, and test"
 	@echo ""
 	@echo "Docker:"
 	@echo "  make docker-build      - Build Docker images"

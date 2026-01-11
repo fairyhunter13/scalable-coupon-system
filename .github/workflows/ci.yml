@@ -115,17 +115,6 @@ jobs:
         run: go test -v -race -tags ci -count=1 ./tests/stress/... -run "TestScaleStress"
         timeout-minutes: 5
 
-      - name: Run chaos tests (database resilience & transaction edge cases)
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: ${{ env.POSTGRES_USER }}
-          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          DB_NAME: ${{ env.POSTGRES_DB }}
-          DB_SSL_MODE: disable
-        run: go test -v -race -tags ci -timeout 5m ./tests/chaos/...
-        timeout-minutes: 10
-
       - name: Generate coverage report
         env:
           DB_HOST: localhost

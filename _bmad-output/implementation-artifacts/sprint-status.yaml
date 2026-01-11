@@ -89,9 +89,9 @@ development_status:
   epic-6-retrospective: done
 
   # Epic 7: CI/CD Enhancements & Visibility
-  epic-7: backlog
-  7-1-codecov-integration: backlog
-  7-2-test-category-badges: backlog
-  7-3-go-version-documentation-update: backlog
-  7-4-version-consistency-check: backlog
+  epic-7: in-progress
+  7-1-codecov-integration: in-progress
+  7-2-test-category-badges: review
+  7-3-go-version-documentation-update: review
+  7-4-version-consistency-check: in-progress
   epic-7-retrospective: optional

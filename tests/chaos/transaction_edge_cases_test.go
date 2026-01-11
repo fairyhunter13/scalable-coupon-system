@@ -1,4 +1,4 @@
-//go:build ci
+//go:build chaos
 
 // Package chaos contains CI-only chaos engineering tests for transaction edge cases.
 //

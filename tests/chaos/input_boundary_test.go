@@ -1,12 +1,13 @@
-//go:build ci
+//go:build chaos
 
-// Package chaos contains CI-only chaos engineering tests for input boundary validation.
+// Package chaos contains chaos engineering tests for input boundary validation.
 // These tests verify the system's behavior under extreme input scenarios including
 // large payloads, special characters, SQL injection attempts, and malformed requests.
 //
-// IMPORTANT: These tests are tagged with "ci" build constraint and should
-// only run in CI environments where infrastructure is controlled.
-// Use: go test -v -race -tags ci ./tests/chaos/...
+// IMPORTANT: These tests run against the real docker-compose infrastructure.
+// Usage:
+//   docker-compose up -d
+//   go test -v -race -tags chaos ./tests/chaos/...
 package chaos
 
 import (
@@ -15,20 +16,14 @@ import (
 	"encoding/json"
 	"io"
 	"math"
-	"net/http/httptest"
+	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-playground/validator/v10"
-	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/fairyhunter13/scalable-coupon-system/internal/handler"
-	"github.com/fairyhunter13/scalable-coupon-system/internal/repository"
-	"github.com/fairyhunter13/scalable-coupon-system/internal/service"
 )
 
 // Test data generators
@@ -86,29 +81,26 @@ var specialCharPayloads = []struct {
 	{"percent", "coupon%name"},
 }
 
-// setupTestApp creates a Fiber app with routes configured for testing.
-func setupTestApp(t *testing.T) *fiber.App {
-	t.Helper()
+// postJSONRaw sends a raw JSON string to the specified endpoint.
+func postJSONRaw(url string, rawJSON string) (*http.Response, error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(rawJSON))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return httpClient.Do(req)
+}
 
-	couponRepo := repository.NewCouponRepository(testPool)
-	claimRepo := repository.NewClaimRepository(testPool)
-	couponService := service.NewCouponService(testPool, couponRepo, claimRepo)
-
-	v := validator.New()
-	couponHandler := handler.NewCouponHandler(couponService, v)
-	claimHandler := handler.NewClaimHandler(couponService, v)
-
-	app := fiber.New(fiber.Config{
-		BodyLimit:             4 * 1024 * 1024, // 4MB body limit for testing
-		ReadBufferSize:        16 * 1024,       // 16KB read buffer for long URLs
-		DisableStartupMessage: true,
-	})
-
-	app.Post("/api/coupons", couponHandler.CreateCoupon)
-	app.Get("/api/coupons/:name", couponHandler.GetCoupon)
-	app.Post("/api/coupons/claim", claimHandler.ClaimCoupon)
-
-	return app
+// postWithContentType sends a request with a specific content type.
+func postWithContentType(url, contentType, body string) (*http.Response, error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	return httpClient.Do(req)
 }
 
 // ============================================================================
@@ -117,7 +109,6 @@ func setupTestApp(t *testing.T) *fiber.App {
 
 func TestCreateCoupon_LongNameBoundary(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
 
 	testCases := []struct {
 		name           string
@@ -129,28 +120,28 @@ func TestCreateCoupon_LongNameBoundary(t *testing.T) {
 		{
 			name:           "255_chars_at_db_limit",
 			couponNameLen:  255,
-			expectedStatus: fiber.StatusCreated,
+			expectedStatus: http.StatusCreated,
 			expectDBError:  false,
 			description:    "Exactly at VARCHAR(255) limit - should succeed",
 		},
 		{
 			name:           "256_chars_exceeds_db_limit",
 			couponNameLen:  256,
-			expectedStatus: fiber.StatusInternalServerError, // DB constraint violation
+			expectedStatus: http.StatusInternalServerError, // DB constraint violation
 			expectDBError:  true,
 			description:    "1 char over VARCHAR(255) limit - DB should reject",
 		},
 		{
 			name:           "1000_chars_far_exceeds_limit",
 			couponNameLen:  1000,
-			expectedStatus: fiber.StatusInternalServerError, // DB constraint violation
+			expectedStatus: http.StatusInternalServerError, // DB constraint violation
 			expectDBError:  true,
 			description:    "1000+ chars per AC#1 - DB should reject",
 		},
 		{
 			name:           "10000_chars_extreme",
 			couponNameLen:  10000,
-			expectedStatus: fiber.StatusInternalServerError, // DB constraint violation
+			expectedStatus: http.StatusInternalServerError, // DB constraint violation
 			expectDBError:  true,
 			description:    "Extreme length - DB should reject",
 		},
@@ -161,15 +152,10 @@ func TestCreateCoupon_LongNameBoundary(t *testing.T) {
 			cleanupTables(t)
 			couponName := generateLongString(tc.couponNameLen)
 
-			body, _ := json.Marshal(map[string]interface{}{
+			resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
 				"name":   couponName,
 				"amount": 100,
 			})
-
-			req := httptest.NewRequest("POST", "/api/coupons", bytes.NewReader(body))
-			req.Header.Set("Content-Type", "application/json")
-
-			resp, err := app.Test(req, -1)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
@@ -195,15 +181,15 @@ func TestCreateCoupon_LongNameBoundary(t *testing.T) {
 
 func TestGetCoupon_LongNameBoundary(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	testCases := []struct {
 		name           string
 		couponNameLen  int
 		expectedStatus int
 	}{
-		{"1000_chars", 1000, fiber.StatusNotFound}, // Valid request, just not found
-		{"5000_chars", 5000, fiber.StatusNotFound},
+		{"1000_chars", 1000, http.StatusNotFound}, // Valid request, just not found
+		{"5000_chars", 5000, http.StatusNotFound},
 	}
 
 	for _, tc := range testCases {
@@ -212,9 +198,9 @@ func TestGetCoupon_LongNameBoundary(t *testing.T) {
 
 			// URL-encode the name to create valid HTTP request
 			encodedName := url.PathEscape(couponName)
-			req := httptest.NewRequest("GET", "/api/coupons/"+encodedName, nil)
+			req, _ := http.NewRequest("GET", formatURL("/api/coupons/"+encodedName), nil)
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
@@ -226,7 +212,7 @@ func TestGetCoupon_LongNameBoundary(t *testing.T) {
 
 func TestClaimCoupon_LongNameBoundary(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	testCases := []struct {
 		name          string
@@ -245,18 +231,18 @@ func TestClaimCoupon_LongNameBoundary(t *testing.T) {
 				"user_id":     generateLongString(tc.userIDLen),
 			})
 
-			req := httptest.NewRequest("POST", "/api/coupons/claim", bytes.NewReader(body))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons/claim"), bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// Should return 404 (not found) since coupon doesn't exist
 			// The important thing is no panic or crash
 			assert.True(t,
-				resp.StatusCode == fiber.StatusNotFound ||
-					resp.StatusCode == fiber.StatusInternalServerError,
+				resp.StatusCode == http.StatusNotFound ||
+					resp.StatusCode == http.StatusInternalServerError,
 				"Should handle long names gracefully")
 		})
 	}
@@ -268,7 +254,7 @@ func TestClaimCoupon_LongNameBoundary(t *testing.T) {
 
 func TestCreateCoupon_SQLInjection(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	for _, payload := range sqlInjectionPayloads {
 		t.Run(payload, func(t *testing.T) {
@@ -279,19 +265,19 @@ func TestCreateCoupon_SQLInjection(t *testing.T) {
 				"amount": 100,
 			})
 
-			req := httptest.NewRequest("POST", "/api/coupons", bytes.NewReader(body))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons"), bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// Should either succeed (safely stored) or fail validation
 			// The key is no SQL injection should occur
 			assert.True(t,
-				resp.StatusCode == fiber.StatusCreated ||
-					resp.StatusCode == fiber.StatusBadRequest ||
-					resp.StatusCode == fiber.StatusInternalServerError,
+				resp.StatusCode == http.StatusCreated ||
+					resp.StatusCode == http.StatusBadRequest ||
+					resp.StatusCode == http.StatusInternalServerError,
 				"SQL injection payload should be handled safely, got status %d", resp.StatusCode)
 
 			// Verify tables still exist (injection didn't drop them)
@@ -302,23 +288,23 @@ func TestCreateCoupon_SQLInjection(t *testing.T) {
 
 func TestGetCoupon_SQLInjection(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	// First create a valid coupon
-	createValidCoupon(t, app, "valid_coupon", 100)
+	createValidCoupon(t, "valid_coupon", 100)
 
 	for _, payload := range sqlInjectionPayloads {
 		t.Run(payload, func(t *testing.T) {
 			// URL-encode the payload to create valid HTTP request
 			encodedPayload := url.PathEscape(payload)
-			req := httptest.NewRequest("GET", "/api/coupons/"+encodedPayload, nil)
+			req, _ := http.NewRequest("GET", formatURL("/api/coupons/"+encodedPayload), nil)
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// Should return 404 (not found) - injection should not bypass security
-			assert.Equal(t, fiber.StatusNotFound, resp.StatusCode,
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode,
 				"SQL injection in GET should return 404")
 
 			// Verify tables still exist
@@ -329,10 +315,10 @@ func TestGetCoupon_SQLInjection(t *testing.T) {
 
 func TestClaimCoupon_SQLInjection(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	// Create a valid coupon first
-	createValidCoupon(t, app, "valid_coupon", 100)
+	createValidCoupon(t, "valid_coupon", 100)
 
 	testCases := []struct {
 		name       string
@@ -351,19 +337,19 @@ func TestClaimCoupon_SQLInjection(t *testing.T) {
 				"user_id":     tc.userID,
 			})
 
-			req := httptest.NewRequest("POST", "/api/coupons/claim", bytes.NewReader(body))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons/claim"), bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// Should return 404 (not found) or 200 (if actually claiming valid coupon with injection user)
 			// The key is no SQL injection occurs
 			assert.True(t,
-				resp.StatusCode == fiber.StatusNotFound ||
-					resp.StatusCode == fiber.StatusOK ||
-					resp.StatusCode == fiber.StatusInternalServerError,
+				resp.StatusCode == http.StatusNotFound ||
+					resp.StatusCode == http.StatusOK ||
+					resp.StatusCode == http.StatusInternalServerError,
 				"SQL injection should be handled safely")
 
 			// Verify tables still exist
@@ -378,7 +364,7 @@ func TestClaimCoupon_SQLInjection(t *testing.T) {
 
 func TestCreateCoupon_SpecialCharacters(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	for _, tc := range specialCharPayloads {
 		t.Run(tc.name, func(t *testing.T) {
@@ -389,34 +375,34 @@ func TestCreateCoupon_SpecialCharacters(t *testing.T) {
 				"amount": 100,
 			})
 
-			req := httptest.NewRequest("POST", "/api/coupons", bytes.NewReader(body))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons"), bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// Either accept safely or reject clearly - no crashes
 			assert.True(t,
-				resp.StatusCode == fiber.StatusCreated ||
-					resp.StatusCode == fiber.StatusBadRequest ||
-					resp.StatusCode == fiber.StatusInternalServerError,
+				resp.StatusCode == http.StatusCreated ||
+					resp.StatusCode == http.StatusBadRequest ||
+					resp.StatusCode == http.StatusInternalServerError,
 				"Special chars should be handled safely, got %d for %s",
 				resp.StatusCode, tc.name)
 
 			// If created, verify we can retrieve it
-			if resp.StatusCode == fiber.StatusCreated {
+			if resp.StatusCode == http.StatusCreated {
 				// URL-encode the payload for GET request
 				encodedPayload := url.PathEscape(tc.payload)
-				getReq := httptest.NewRequest("GET", "/api/coupons/"+encodedPayload, nil)
-				getResp, err := app.Test(getReq, -1)
+				getReq, _ := http.NewRequest("GET", formatURL("/api/coupons/"+encodedPayload), nil)
+				getResp, err := httpClient.Do(getReq)
 				require.NoError(t, err)
 				defer getResp.Body.Close()
 
 				// Should be able to retrieve or get 404 (URL decoding differences)
 				assert.True(t,
-					getResp.StatusCode == fiber.StatusOK ||
-						getResp.StatusCode == fiber.StatusNotFound,
+					getResp.StatusCode == http.StatusOK ||
+						getResp.StatusCode == http.StatusNotFound,
 					"Should handle special char retrieval")
 			}
 		})
@@ -425,32 +411,32 @@ func TestCreateCoupon_SpecialCharacters(t *testing.T) {
 
 func TestClaimCoupon_SpecialCharacters(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	for _, tc := range specialCharPayloads {
 		t.Run(tc.name+"_in_user_id", func(t *testing.T) {
 			cleanupTables(t)
 
 			// First create a valid coupon
-			createValidCoupon(t, app, "test_coupon", 100)
+			createValidCoupon(t, "test_coupon", 100)
 
 			body, _ := json.Marshal(map[string]interface{}{
 				"coupon_name": "test_coupon",
 				"user_id":     tc.payload,
 			})
 
-			req := httptest.NewRequest("POST", "/api/coupons/claim", bytes.NewReader(body))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons/claim"), bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// Either succeed or fail gracefully - no crashes
 			assert.True(t,
-				resp.StatusCode == fiber.StatusOK ||
-					resp.StatusCode == fiber.StatusBadRequest ||
-					resp.StatusCode == fiber.StatusInternalServerError,
+				resp.StatusCode == http.StatusOK ||
+					resp.StatusCode == http.StatusBadRequest ||
+					resp.StatusCode == http.StatusInternalServerError,
 				"Special chars in user_id should be handled safely")
 		})
 	}
@@ -462,7 +448,7 @@ func TestClaimCoupon_SpecialCharacters(t *testing.T) {
 
 func TestCreateCoupon_AmountBoundary(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	testCases := []struct {
 		name           string
@@ -470,15 +456,15 @@ func TestCreateCoupon_AmountBoundary(t *testing.T) {
 		expectedStatus int
 		description    string
 	}{
-		{"amount_zero", 0, fiber.StatusBadRequest, "Zero should be rejected (gte=1)"},
-		{"amount_negative", -1, fiber.StatusBadRequest, "Negative should be rejected"},
-		{"amount_negative_large", -100, fiber.StatusBadRequest, "Large negative should be rejected"},
-		{"amount_one", 1, fiber.StatusCreated, "Minimum valid (1) should succeed"},
-		{"amount_positive", 100, fiber.StatusCreated, "Normal positive should succeed"},
-		{"amount_max_int32", math.MaxInt32, fiber.StatusCreated, "MaxInt32 should succeed"},
-		{"amount_float", 1.5, fiber.StatusBadRequest, "Float should be rejected or truncated"},
-		{"amount_string", "100", fiber.StatusBadRequest, "String type should be rejected"},
-		{"amount_null", nil, fiber.StatusBadRequest, "Null should be rejected (required)"},
+		{"amount_zero", 0, http.StatusBadRequest, "Zero should be rejected (gte=1)"},
+		{"amount_negative", -1, http.StatusBadRequest, "Negative should be rejected"},
+		{"amount_negative_large", -100, http.StatusBadRequest, "Large negative should be rejected"},
+		{"amount_one", 1, http.StatusCreated, "Minimum valid (1) should succeed"},
+		{"amount_positive", 100, http.StatusCreated, "Normal positive should succeed"},
+		{"amount_max_int32", math.MaxInt32, http.StatusCreated, "MaxInt32 should succeed"},
+		{"amount_float", 1.5, http.StatusBadRequest, "Float should be rejected or truncated"},
+		{"amount_string", "100", http.StatusBadRequest, "String type should be rejected"},
+		{"amount_null", nil, http.StatusBadRequest, "Null should be rejected (required)"},
 	}
 
 	for _, tc := range testCases {
@@ -496,18 +482,18 @@ func TestCreateCoupon_AmountBoundary(t *testing.T) {
 
 			body, _ := json.Marshal(payload)
 
-			req := httptest.NewRequest("POST", "/api/coupons", bytes.NewReader(body))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons"), bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// For float, Fiber might truncate or reject - both are acceptable
 			if tc.name == "amount_float" {
 				assert.True(t,
-					resp.StatusCode == fiber.StatusCreated ||
-						resp.StatusCode == fiber.StatusBadRequest,
+					resp.StatusCode == http.StatusCreated ||
+						resp.StatusCode == http.StatusBadRequest,
 					"Float handling should be consistent")
 			} else {
 				assert.Equal(t, tc.expectedStatus, resp.StatusCode,
@@ -520,7 +506,7 @@ func TestCreateCoupon_AmountBoundary(t *testing.T) {
 
 func TestCreateCoupon_AmountOverflow(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	// Test MaxInt64 + 1 via raw JSON (overflow)
 	overflowPayloads := []struct {
@@ -541,17 +527,17 @@ func TestCreateCoupon_AmountOverflow(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cleanupTables(t)
 
-			req := httptest.NewRequest("POST", "/api/coupons", strings.NewReader(tc.rawJSON))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons"), strings.NewReader(tc.rawJSON))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// Should reject with 400 (JSON parsing error or validation error)
 			assert.True(t,
-				resp.StatusCode == fiber.StatusBadRequest ||
-					resp.StatusCode == fiber.StatusInternalServerError,
+				resp.StatusCode == http.StatusBadRequest ||
+					resp.StatusCode == http.StatusInternalServerError,
 				"Overflow should be rejected, got %d", resp.StatusCode)
 		})
 	}
@@ -563,7 +549,7 @@ func TestCreateCoupon_AmountOverflow(t *testing.T) {
 
 func TestCreateCoupon_MalformedJSON(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	malformedPayloads := []struct {
 		name    string
@@ -587,15 +573,15 @@ func TestCreateCoupon_MalformedJSON(t *testing.T) {
 
 	for _, tc := range malformedPayloads {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", "/api/coupons", strings.NewReader(tc.body))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons"), strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// All malformed JSON should return 400
-			assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode,
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode,
 				"Malformed JSON should return 400, got %d for %s", resp.StatusCode, tc.name)
 		})
 	}
@@ -603,7 +589,7 @@ func TestCreateCoupon_MalformedJSON(t *testing.T) {
 
 func TestCreateCoupon_WrongContentType(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	contentTypes := []struct {
 		name        string
@@ -619,20 +605,20 @@ func TestCreateCoupon_WrongContentType(t *testing.T) {
 
 	for _, tc := range contentTypes {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", "/api/coupons", strings.NewReader(tc.body))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons"), strings.NewReader(tc.body))
 			if tc.contentType != "" {
 				req.Header.Set("Content-Type", tc.contentType)
 			}
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// Wrong content type should return 400 or succeed if Fiber parses it
 			// The key is no crashes
 			assert.True(t,
-				resp.StatusCode == fiber.StatusBadRequest ||
-					resp.StatusCode == fiber.StatusCreated,
+				resp.StatusCode == http.StatusBadRequest ||
+					resp.StatusCode == http.StatusCreated,
 				"Wrong content type should be handled gracefully")
 		})
 	}
@@ -640,7 +626,7 @@ func TestCreateCoupon_WrongContentType(t *testing.T) {
 
 func TestCreateCoupon_LargePayload(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	payloadSizes := []struct {
 		name          string
@@ -668,10 +654,10 @@ func TestCreateCoupon_LargePayload(t *testing.T) {
 			}
 			largeData.WriteString(`"}`)
 
-			req := httptest.NewRequest("POST", "/api/coupons", strings.NewReader(largeData.String()))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons"), strings.NewReader(largeData.String()))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 
 			if tc.expectedLimit {
 				// For oversized payloads, either an error is returned or a 413/400 status
@@ -682,8 +668,8 @@ func TestCreateCoupon_LargePayload(t *testing.T) {
 				} else {
 					defer resp.Body.Close()
 					assert.True(t,
-						resp.StatusCode == fiber.StatusRequestEntityTooLarge ||
-							resp.StatusCode == fiber.StatusBadRequest,
+						resp.StatusCode == http.StatusRequestEntityTooLarge ||
+							resp.StatusCode == http.StatusBadRequest,
 						"Large payload should be rejected, got %d", resp.StatusCode)
 				}
 			} else {
@@ -692,10 +678,10 @@ func TestCreateCoupon_LargePayload(t *testing.T) {
 				// Should process normally - will likely fail on create since extra field exists
 				// but that's fine, the key is no crash or resource exhaustion
 				assert.True(t,
-					resp.StatusCode == fiber.StatusCreated ||
-						resp.StatusCode == fiber.StatusBadRequest ||
-						resp.StatusCode == fiber.StatusConflict ||
-						resp.StatusCode == fiber.StatusInternalServerError,
+					resp.StatusCode == http.StatusCreated ||
+						resp.StatusCode == http.StatusBadRequest ||
+						resp.StatusCode == http.StatusConflict ||
+						resp.StatusCode == http.StatusInternalServerError,
 					"Normal payload should be processed, got %d", resp.StatusCode)
 			}
 		})
@@ -704,7 +690,7 @@ func TestCreateCoupon_LargePayload(t *testing.T) {
 
 func TestCreateCoupon_DeeplyNestedJSON(t *testing.T) {
 	cleanupTables(t)
-	app := setupTestApp(t)
+	
 
 	testCases := []struct {
 		name  string
@@ -727,17 +713,17 @@ func TestCreateCoupon_DeeplyNestedJSON(t *testing.T) {
 				nested.WriteString(`}`)
 			}
 
-			req := httptest.NewRequest("POST", "/api/coupons", strings.NewReader(nested.String()))
+			req, _ := http.NewRequest("POST", formatURL("/api/coupons"), strings.NewReader(nested.String()))
 			req.Header.Set("Content-Type", "application/json")
 
-			resp, err := app.Test(req, -1)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
 			// Should handle gracefully - either reject or fail validation
 			assert.True(t,
-				resp.StatusCode == fiber.StatusBadRequest ||
-					resp.StatusCode == fiber.StatusInternalServerError,
+				resp.StatusCode == http.StatusBadRequest ||
+					resp.StatusCode == http.StatusInternalServerError,
 				"Deeply nested JSON should be handled gracefully, got %d", resp.StatusCode)
 		})
 	}
@@ -777,25 +763,20 @@ func verifyTablesExist(t *testing.T) {
 	assert.True(t, claimsExists, "claims table should still exist")
 }
 
-// createValidCoupon creates a valid coupon for testing.
-func createValidCoupon(t *testing.T, app *fiber.App, name string, amount int) {
+// createValidCoupon creates a valid coupon for testing via HTTP API.
+func createValidCoupon(t *testing.T, name string, amount int) {
 	t.Helper()
 
-	body, _ := json.Marshal(map[string]interface{}{
+	resp, err := postJSON(formatURL("/api/coupons"), map[string]interface{}{
 		"name":   name,
 		"amount": amount,
 	})
-
-	req := httptest.NewRequest("POST", "/api/coupons", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req, -1)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
 	// Read body to ensure it's fully consumed
 	_, _ = io.ReadAll(resp.Body)
 
-	require.Equal(t, fiber.StatusCreated, resp.StatusCode,
+	require.Equal(t, http.StatusCreated, resp.StatusCode,
 		"Failed to create test coupon %s", name)
 }

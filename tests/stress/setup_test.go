@@ -1,110 +1,224 @@
+//go:build stress
+
+// Package stress contains stress tests that run against the real docker-compose infrastructure.
+// These tests require docker-compose to be running before execution.
+//
+// Usage:
+//   docker-compose up -d                                    # Start services
+//   go test -v -race -tags stress ./tests/stress/...        # Run tests
+//   docker-compose down                                     # Cleanup
+//
+// Environment Variables:
+//   TEST_SERVER_URL  - API server URL (default: http://localhost:3000)
+//   TEST_DB_URL      - Database URL (default: postgres://postgres:postgres@localhost:5432/coupon_db?sslmode=disable)
 package stress
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
 )
 
-var testPool *pgxpool.Pool
+var (
+	testPool   *pgxpool.Pool
+	testServer string // The base URL for the test server (e.g., "http://localhost:3000")
+	httpClient *http.Client
+)
 
 func TestMain(m *testing.M) {
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("Could not construct pool: %s", err)
+	// Get server URL from environment or use default (docker-compose API)
+	testServer = os.Getenv("TEST_SERVER_URL")
+	if testServer == "" {
+		testServer = "http://localhost:3000"
 	}
 
-	err = pool.Client.Ping()
-	if err != nil {
-		log.Fatalf("Could not connect to Docker: %s", err)
+	// Get database URL from environment or use default (docker-compose PostgreSQL)
+	databaseURL := os.Getenv("TEST_DB_URL")
+	if databaseURL == "" {
+		databaseURL = "postgres://postgres:postgres@localhost:5432/coupon_db?sslmode=disable"
 	}
 
-	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Repository: "postgres",
-		Tag:        "15-alpine",
-		Env: []string{
-			"POSTGRES_PASSWORD=testpass",
-			"POSTGRES_USER=testuser",
-			"POSTGRES_DB=testdb",
-			"listen_addresses='*'",
-		},
-	}, func(config *docker.HostConfig) {
-		config.AutoRemove = true
-		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
-	})
+	log.Printf("Stress test configuration:")
+	log.Printf("  Server URL: %s", testServer)
+	log.Printf("  Database URL: %s", databaseURL)
+
+	// Connect to the database
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var err error
+	testPool, err = pgxpool.New(ctx, databaseURL)
 	if err != nil {
-		log.Fatalf("Could not start resource: %s", err)
-	}
-
-	hostAndPort := resource.GetHostPort("5432/tcp")
-	databaseURL := fmt.Sprintf("postgres://testuser:testpass@%s/testdb?sslmode=disable", hostAndPort)
-
-	log.Println("Connecting to database on url:", databaseURL)
-
-	_ = resource.Expire(120) // Tell docker to kill the container after 120 seconds
-
-	// Retry connection
-	pool.MaxWait = 120 * time.Second
-	if err = pool.Retry(func() error {
-		var err error
-		testPool, err = pgxpool.New(context.Background(), databaseURL)
-		if err != nil {
-			return err
-		}
-		return testPool.Ping(context.Background())
-	}); err != nil {
 		log.Fatalf("Could not connect to database: %s", err)
 	}
 
-	// Run migrations
-	if err := runMigrations(testPool); err != nil {
-		log.Fatalf("Could not run migrations: %s", err)
+	// Verify database connection
+	if err := testPool.Ping(ctx); err != nil {
+		log.Fatalf("Could not ping database: %s", err)
+	}
+	log.Println("Database connection established")
+
+	// Verify server is running by hitting a simple endpoint
+	httpClient = &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Wait for server to be ready
+	maxRetries := 30
+	for i := 0; i < maxRetries; i++ {
+		resp, err := httpClient.Get(testServer + "/health")
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				log.Println("Server is ready")
+				break
+			}
+		}
+		if i == maxRetries-1 {
+			log.Fatalf("Server not responding at %s after %d retries. Ensure docker-compose is running.", testServer, maxRetries)
+		}
+		log.Printf("Waiting for server... (attempt %d/%d)", i+1, maxRetries)
+		time.Sleep(1 * time.Second)
 	}
 
 	code := m.Run()
 
 	// Cleanup
-	if err := pool.Purge(resource); err != nil {
-		log.Fatalf("Could not purge resource: %s", err)
-	}
+	testPool.Close()
 
 	os.Exit(code)
 }
 
-func runMigrations(pool *pgxpool.Pool) error {
-	schema := `
-		CREATE TABLE IF NOT EXISTS coupons (
-			name VARCHAR(255) PRIMARY KEY,
-			amount INTEGER NOT NULL CHECK (amount > 0),
-			remaining_amount INTEGER NOT NULL CHECK (remaining_amount >= 0),
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		);
-
-		CREATE TABLE IF NOT EXISTS claims (
-			id SERIAL PRIMARY KEY,
-			user_id VARCHAR(255) NOT NULL,
-			coupon_name VARCHAR(255) NOT NULL REFERENCES coupons(name),
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			UNIQUE(user_id, coupon_name)
-		);
-
-		CREATE INDEX IF NOT EXISTS idx_claims_coupon_name ON claims(coupon_name);
-	`
-	_, err := pool.Exec(context.Background(), schema)
-	return err
-}
-
 func cleanupTables(t *testing.T) {
 	t.Helper()
-	_, err := testPool.Exec(context.Background(), "TRUNCATE TABLE claims, coupons CASCADE")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := testPool.Exec(ctx, "TRUNCATE TABLE claims, coupons CASCADE")
 	if err != nil {
 		t.Fatalf("Failed to cleanup tables: %v", err)
 	}
+}
+
+// Helper function to make POST requests with JSON body
+func postJSON(url string, body interface{}) (*http.Response, error) {
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	return httpClient.Do(req)
+}
+
+// Helper function to make GET requests
+func getJSON(url string) (*http.Response, error) {
+	return httpClient.Get(url)
+}
+
+// Helper function to read response body as JSON
+func readJSONResponse(resp *http.Response, v interface{}) error {
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, v)
+}
+
+// createTestCoupon creates a coupon directly in the database for testing
+func createTestCoupon(t *testing.T, name string, amount int) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := testPool.Exec(ctx,
+		"INSERT INTO coupons (name, amount, remaining_amount) VALUES ($1, $2, $2)",
+		name, amount)
+	if err != nil {
+		t.Fatalf("Failed to create test coupon: %v", err)
+	}
+}
+
+// getCouponFromDB retrieves coupon data directly from the database
+func getCouponFromDB(t *testing.T, name string) (remainingAmount int, claimCount int) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := testPool.QueryRow(ctx,
+		"SELECT remaining_amount FROM coupons WHERE name = $1",
+		name).Scan(&remainingAmount)
+	if err != nil {
+		t.Fatalf("Failed to get coupon remaining_amount: %v", err)
+	}
+
+	err = testPool.QueryRow(ctx,
+		"SELECT COUNT(*) FROM claims WHERE coupon_name = $1",
+		name).Scan(&claimCount)
+	if err != nil {
+		t.Fatalf("Failed to get claim count: %v", err)
+	}
+
+	return remainingAmount, claimCount
+}
+
+// getUniqueClaimers returns the count of unique users who claimed a coupon
+func getUniqueClaimers(t *testing.T, couponName string) int {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var count int
+	err := testPool.QueryRow(ctx,
+		"SELECT COUNT(DISTINCT user_id) FROM claims WHERE coupon_name = $1",
+		couponName).Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to get unique claimers: %v", err)
+	}
+	return count
+}
+
+// waitForServerHealth waits for the server to be healthy
+func waitForServerHealth(t *testing.T, maxWait time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(maxWait)
+	for time.Now().Before(deadline) {
+		resp, err := httpClient.Get(testServer + "/health")
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	t.Fatalf("Server did not become healthy within %v", maxWait)
+}
+
+// logPoolStats logs the current database pool statistics
+func logPoolStats(t *testing.T, prefix string) {
+	t.Helper()
+	stats := testPool.Stat()
+	t.Logf("%s - Pool stats: Total=%d, Idle=%d, Acquired=%d",
+		prefix, stats.TotalConns(), stats.IdleConns(), stats.AcquiredConns())
+}
+
+// formatURL creates a full URL from the test server base and a path
+func formatURL(path string) string {
+	return fmt.Sprintf("%s%s", testServer, path)
 }

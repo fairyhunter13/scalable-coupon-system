@@ -101,35 +101,55 @@ func TestHealthHandler_Check_SlowResponse(t *testing.T) {
 	assert.Contains(t, string(body), `"status":"healthy"`)
 }
 
-func TestHealthHandler_Check_ContextTimeout(t *testing.T) {
-	// Test that context timeout is properly propagated
+func TestHealthHandler_Check_ContextCanceled(t *testing.T) {
+	// Test that context cancellation is properly handled
+	// We simulate a canceled context by having the mock return context.Canceled
 	app := fiber.New()
 
-	// Mock pool that will block longer than the test timeout
+	// Mock pool that returns context.Canceled error (simulates canceled context)
 	pool := &mockPool{
-		pingErr:   nil,
-		pingDelay: 5 * time.Second, // Will be canceled by context
+		pingErr: context.Canceled,
 	}
 	handler := NewHealthHandler(pool)
 	app.Get("/health", handler.Check)
 
 	req := httptest.NewRequest("GET", "/health", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
-	// Use a very short timeout to trigger context deadline exceeded
-	resp, err := app.Test(req, 100) // 100ms timeout
+	// Should return 503 unhealthy when ping fails due to context cancellation
+	assert.Equal(t, fiber.StatusServiceUnavailable, resp.StatusCode)
 
-	// The test might return an error due to timeout, or a response
-	// Either way, the handler should not panic
-	if err != nil {
-		// Timeout error is expected
-		assert.Contains(t, err.Error(), "timeout")
-	} else {
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-		// If we got a response, it should indicate unhealthy due to context cancellation
-		// Note: Fiber might return 503 or the test might have succeeded before timeout
-		body, _ := io.ReadAll(resp.Body)
-		t.Logf("Response status: %d, body: %s", resp.StatusCode, string(body))
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), `"status":"unhealthy"`)
+}
+
+func TestHealthHandler_Check_DeadlineExceeded(t *testing.T) {
+	// Test that context deadline exceeded is properly handled
+	app := fiber.New()
+
+	// Mock pool that returns context.DeadlineExceeded error
+	pool := &mockPool{
+		pingErr: context.DeadlineExceeded,
 	}
+	handler := NewHealthHandler(pool)
+	app.Get("/health", handler.Check)
+
+	req := httptest.NewRequest("GET", "/health", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	// Should return 503 unhealthy when ping times out
+	assert.Equal(t, fiber.StatusServiceUnavailable, resp.StatusCode)
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), `"status":"unhealthy"`)
 }

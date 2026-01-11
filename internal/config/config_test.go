@@ -260,3 +260,107 @@ func TestLoad_DefaultValues(t *testing.T) {
 	assert.NotZero(t, cfg.DB.Port, "DB port should be set")
 	assert.NotEmpty(t, cfg.Log.Level, "Log level should be set")
 }
+
+// TestConfig_WarnIfDefaultCredentials tests the security warning function.
+func TestConfig_WarnIfDefaultCredentials(t *testing.T) {
+	t.Run("all_defaults_returns_all_warnings", func(t *testing.T) {
+		cfg := &Config{
+			DB: DBConfig{
+				User:     "postgres",
+				Password: "postgres",
+				SSLMode:  "disable",
+			},
+		}
+
+		warnings := cfg.WarnIfDefaultCredentials()
+		assert.Len(t, warnings, 3, "Should return 3 warnings for all defaults")
+		assert.Contains(t, warnings[0], "DB_PASSWORD")
+		assert.Contains(t, warnings[1], "DB_USER")
+		assert.Contains(t, warnings[2], "DB_SSLMODE")
+	})
+
+	t.Run("custom_password_only", func(t *testing.T) {
+		cfg := &Config{
+			DB: DBConfig{
+				User:     "postgres",
+				Password: "secure_password_123",
+				SSLMode:  "disable",
+			},
+		}
+
+		warnings := cfg.WarnIfDefaultCredentials()
+		assert.Len(t, warnings, 2, "Should return 2 warnings (user and SSL)")
+
+		// Should not contain password warning
+		for _, w := range warnings {
+			assert.NotContains(t, w, "DB_PASSWORD")
+		}
+	})
+
+	t.Run("custom_user_only", func(t *testing.T) {
+		cfg := &Config{
+			DB: DBConfig{
+				User:     "custom_user",
+				Password: "postgres",
+				SSLMode:  "disable",
+			},
+		}
+
+		warnings := cfg.WarnIfDefaultCredentials()
+		assert.Len(t, warnings, 2, "Should return 2 warnings (password and SSL)")
+
+		// Should not contain user warning
+		for _, w := range warnings {
+			assert.NotContains(t, w, "DB_USER")
+		}
+	})
+
+	t.Run("ssl_mode_require", func(t *testing.T) {
+		cfg := &Config{
+			DB: DBConfig{
+				User:     "postgres",
+				Password: "postgres",
+				SSLMode:  "require",
+			},
+		}
+
+		warnings := cfg.WarnIfDefaultCredentials()
+		assert.Len(t, warnings, 2, "Should return 2 warnings (password and user)")
+
+		// Should not contain SSL warning
+		for _, w := range warnings {
+			assert.NotContains(t, w, "DB_SSLMODE")
+		}
+	})
+
+	t.Run("all_custom_returns_empty", func(t *testing.T) {
+		cfg := &Config{
+			DB: DBConfig{
+				User:     "production_user",
+				Password: "super_secure_password",
+				SSLMode:  "verify-full",
+			},
+		}
+
+		warnings := cfg.WarnIfDefaultCredentials()
+		assert.Empty(t, warnings, "Should return no warnings when all values are custom")
+	})
+
+	t.Run("verify_ca_ssl_mode_no_warning", func(t *testing.T) {
+		cfg := &Config{
+			DB: DBConfig{
+				User:     "postgres",
+				Password: "postgres",
+				SSLMode:  "verify-ca",
+			},
+		}
+
+		warnings := cfg.WarnIfDefaultCredentials()
+		assert.Len(t, warnings, 2, "Should return 2 warnings (only user and password)")
+
+		// Should not contain SSL warning
+		for _, w := range warnings {
+			assert.NotContains(t, w, "DB_SSLMODE")
+		}
+	})
+}

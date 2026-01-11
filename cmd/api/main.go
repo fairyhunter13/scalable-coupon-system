@@ -7,7 +7,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -19,6 +18,7 @@ import (
 	"github.com/fairyhunter13/scalable-coupon-system/internal/handler"
 	"github.com/fairyhunter13/scalable-coupon-system/internal/repository"
 	"github.com/fairyhunter13/scalable-coupon-system/internal/service"
+	"github.com/fairyhunter13/scalable-coupon-system/internal/validator"
 	"github.com/fairyhunter13/scalable-coupon-system/pkg/database"
 )
 
@@ -31,6 +31,11 @@ func main() {
 
 	// Initialize zerolog based on configuration
 	initLogger(cfg)
+
+	// Log security warnings for default credentials
+	for _, warning := range cfg.WarnIfDefaultCredentials() {
+		log.Warn().Msg(warning)
+	}
 
 	// Create context for startup
 	ctx := context.Background()
@@ -55,7 +60,7 @@ func main() {
 	app.Use(requestid.New()) // Adds X-Request-ID header to all requests
 	app.Use(logger.New())
 
-	// Initialize validator
+	// Initialize validator with custom validations
 	validate := validator.New()
 
 	// Initialize coupon components (layered architecture)

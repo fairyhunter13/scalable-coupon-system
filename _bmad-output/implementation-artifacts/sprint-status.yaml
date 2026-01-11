@@ -85,7 +85,7 @@ development_status:
   6-3-input-boundary-testing: done
   6-4-transaction-edge-cases: done
   6-5-mixed-load-and-chaos-testing: done
-  6-6-restructure-ci-pipeline-with-staged-quality-gates: in-progress
+  6-6-restructure-ci-pipeline-with-staged-quality-gates: review
   epic-6-retrospective: optional
 
   # Epic 7: CI/CD Enhancements & Visibility

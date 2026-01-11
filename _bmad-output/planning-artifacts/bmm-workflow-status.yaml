@@ -1,0 +1,105 @@
+# Workflow Status Template
+
+# This tracks progress through BMM methodology Analysis, Planning, and Solutioning phases.
+# Implementation phase is tracked separately in sprint-status.yaml
+
+# STATUS DEFINITIONS:
+# ==================
+# Initial Status (before completion):
+#   - required: Must be completed to progress
+#   - optional: Can be completed but not required
+#   - recommended: Strongly suggested but not required
+#   - conditional: Required only if certain conditions met (e.g., if_has_ui)
+#   - skipped: Optional/conditional workflow that was skipped
+#
+# Completion Status:
+#   - {file-path}: File created/found (e.g., "docs/product-brief.md")
+
+generated: "2026-01-11"
+project: "scalable-coupon-system"
+project_type: "Flash Sale Coupon System REST API"
+selected_track: "enterprise-bmad-method"
+field_type: "greenfield"
+workflow_path: "enterprise-greenfield.yaml"
+
+workflow_status:
+  # Phase 1: Analysis (Optional)
+  phase_1_analysis:
+    brainstorm:
+      status: "skipped"
+      agent: "analyst"
+      command: "/bmad:bmm:workflows:brainstorming"
+    research:
+      status: "skipped"
+      agent: "analyst"
+      command: "/bmad:bmm:workflows:research"
+    product-brief:
+      status: "_bmad-output/planning-artifacts/product-brief-scalable-coupon-system-2026-01-11.md"
+      completed_at: "2026-01-11"
+      agent: "analyst"
+      command: "/bmad:bmm:workflows:create-product-brief"
+
+  # Phase 2: Planning
+  phase_2_planning:
+    prd:
+      status: "_bmad-output/planning-artifacts/prd.md"
+      completed_at: "2026-01-11"
+      agent: "pm"
+      command: "/bmad:bmm:workflows:create-prd"
+      output: "Product Requirements Document with FRs and NFRs"
+    create-ux-design:
+      status: "skipped"
+      condition: "if_has_ui"
+      agent: "ux-designer"
+      command: "/bmad:bmm:workflows:create-ux-design"
+      note: "This is a REST API - no UI needed"
+
+  # Phase 3: Solutioning
+  phase_3_solutioning:
+    create-architecture:
+      status: "_bmad-output/planning-artifacts/architecture.md"
+      completed_at: "2026-01-11"
+      agent: "architect"
+      command: "/bmad:bmm:workflows:create-architecture"
+      output: "System architecture document"
+      note: "Critical for concurrency/locking strategy design"
+    create-epics-and-stories:
+      status: "_bmad-output/planning-artifacts/epics.md"
+      completed_at: "2026-01-11"
+      agent: "pm"
+      command: "/bmad:bmm:workflows:create-epics-and-stories"
+      note: "Break down PRD into implementable epics and stories"
+    test-design:
+      status: "optional"
+      agent: "tea"
+      command: "/bmad:bmm:workflows:testarch-test-design"
+      output: "System-level testability review"
+      note: "Recommended given stress test requirements"
+    implementation-readiness:
+      status: "required"
+      agent: "architect"
+      command: "/bmad:bmm:workflows:check-implementation-readiness"
+      note: "Validates PRD + Architecture + Epics alignment"
+
+  # Phase 4: Implementation
+  phase_4_implementation:
+    sprint-planning:
+      status: "required"
+      agent: "sm"
+      command: "/bmad:bmm:workflows:sprint-planning"
+      note: "Creates sprint plan - subsequent work tracked in sprint-status.yaml"
+
+# Project Context
+project_context:
+  description: "REST API in Golang for Flash Sale Coupon System with high concurrency handling"
+  tech_stack:
+    language: "Golang"
+    database: "PostgreSQL"
+    infrastructure: "Docker / Docker Compose"
+  key_requirements:
+    - "Atomic transactions for claim operations"
+    - "Uniqueness constraint on (user_id, coupon_name)"
+    - "Separation of Coupon and Claim tables"
+    - "Handle 50 concurrent requests correctly"
+  documentation:
+    requirements: "docs/requirements/flash-sale-coupon-system-spec.md"

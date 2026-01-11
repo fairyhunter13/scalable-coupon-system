@@ -1,0 +1,47 @@
+# Git
+.git/
+.gitignore
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# BMAD workflow files
+_bmad/
+_bmad-output/
+.agent/
+.claude/
+.codex/
+.windsurf/
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Test files
+tests/
+*_test.go
+coverage/
+
+# Development files
+.air.toml
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+bin/
+*.exe
+
+# Secrets (never include in Docker image)
+secrets/
+*.sops
+.sops.yaml
+project_requirements/
+
+# OS files
+.DS_Store
+Thumbs.db

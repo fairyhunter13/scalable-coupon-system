@@ -1,12 +1,27 @@
 # Scalable Coupon System
 
+<!-- Build & CI -->
 [![CI](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml)
-[![Security](https://img.shields.io/badge/security-gosec%20%7C%20govulncheck-green)](https://github.com/fairyhunter13/scalable-coupon-system/security)
+[![Build](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Build)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ABuild)
+
+<!-- Tests (Story 7.2 - Per-Category Badges) -->
+[![Unit Tests](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Unit%20Tests%20%26%20Coverage)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Unit+Tests+%26+Coverage%22)
+[![Integration Tests](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Integration%20Tests)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Integration+Tests%22)
+[![Stress Tests](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Stress%20Tests)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Stress+Tests%22)
+[![Chaos Tests](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Chaos%20Tests)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Chaos+Tests%22)
+
+<!-- Code Quality -->
+[![Lint](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Lint)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ALint)
 [![Go Report Card](https://goreportcard.com/badge/github.com/fairyhunter13/scalable-coupon-system)](https://goreportcard.com/report/github.com/fairyhunter13/scalable-coupon-system)
-[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25-green)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/fairyhunter13/scalable-coupon-system/graph/badge.svg)](https://codecov.io/gh/fairyhunter13/scalable-coupon-system)
+
+<!-- Security -->
+[![Security](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Security)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ASecurity)
+
+<!-- Project Info -->
 [![Go Reference](https://pkg.go.dev/badge/github.com/fairyhunter13/scalable-coupon-system.svg)](https://pkg.go.dev/github.com/fairyhunter13/scalable-coupon-system)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A Flash Sale Coupon System REST API demonstrating production-grade Golang backend engineering with atomic claim processing under high concurrency.
 

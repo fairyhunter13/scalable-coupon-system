@@ -1,6 +1,12 @@
 # Scalable Coupon System
 
 [![CI](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml)
+[![Security](https://img.shields.io/badge/security-gosec%20%7C%20govulncheck-green)](https://github.com/fairyhunter13/scalable-coupon-system/security)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fairyhunter13/scalable-coupon-system)](https://goreportcard.com/report/github.com/fairyhunter13/scalable-coupon-system)
+[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25-green)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/fairyhunter13/scalable-coupon-system.svg)](https://pkg.go.dev/github.com/fairyhunter13/scalable-coupon-system)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 
 A Flash Sale Coupon System REST API demonstrating production-grade Golang backend engineering with atomic claim processing under high concurrency.
 
@@ -121,7 +127,75 @@ make decrypt-requirements  # Decrypt secrets/ to project_requirements/
 
 See `make help` for full command reference.
 
-### Local Development (requires Go 1.21+)
+## CI/CD Pipeline
+
+The CI pipeline uses a **staged quality gates architecture** to provide fast feedback and prevent wasted CI resources.
+
+### Pipeline Structure
+
+```
+┌────────────────── PUSH/PR TRIGGER ──────────────────┐
+│                                                      │
+▼                                                      │
+┌────────────────────────────────────────────────────┐ │
+│       STAGE 1: Quality Gates (Parallel, ~2-3 min)  │ │
+│                                                    │ │
+│  ┌──────────────┐  ┌──────────┐  ┌─────────────┐  │ │
+│  │ unit-tests   │  │   lint   │  │  security   │  │ │
+│  │  + 80% cov   │  │ golangci │  │ gosec+vuln  │  │ │
+│  └──────────────┘  └──────────┘  └─────────────┘  │ │
+│                                                    │ │
+└────────────────────────────────────────────────────┘ │
+                         │                             │
+                   ALL MUST PASS                       │
+                         │                             │
+                         ▼                             │
+┌────────────────────────────────────────────────────┐ │
+│       STAGE 2: Database Tests (Parallel, ~5-8 min)  │ │
+│                                                    │ │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │ │
+│  │ integration  │  │    stress    │  │  chaos   │ │ │
+│  │    tests     │  │    tests     │  │  tests   │ │ │
+│  └──────────────┘  └──────────────┘  └──────────┘ │ │
+│                                                    │ │
+└────────────────────────────────────────────────────┘ │
+                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+### Stage 1: Quality Gates (No Database)
+
+Fast, parallel jobs that catch issues early:
+
+| Job | Purpose | Requirement |
+|-----|---------|-------------|
+| `unit-tests` | Run `./internal/...` tests with race detection | **≥80% coverage** (enforced) |
+| `lint` | golangci-lint + go vet | No linting errors |
+| `security` | gosec + govulncheck | No security issues |
+
+**Why 80% Coverage?**
+Per NFR11 requirements, unit test coverage must meet 80% threshold. This is enforced in Stage 1 to catch coverage drops early before running expensive database tests.
+
+### Stage 2: Database Tests (Depends on Stage 1)
+
+These jobs only run after **ALL** Stage 1 jobs pass:
+
+| Job | Purpose | Tests Included |
+|-----|---------|---------------|
+| `integration-tests` | API endpoint tests | `./tests/integration/...` |
+| `stress-tests` | Concurrency scenarios | Flash Sale, Double Dip, Scale tests |
+| `chaos-tests` | Resilience and edge cases | DB Resilience, Input Boundary, Transaction Edge Cases, Mixed Load |
+
+**Dependency:** All Stage 2 jobs have `needs: [unit-tests, lint, security]`
+
+### Benefits of Staged Pipeline
+
+1. **Fast Feedback**: Stage 1 jobs (~2-3 min) catch most issues before slow DB tests
+2. **Resource Efficiency**: Stage 2 tests (~5-8 min each) only run when basic quality passes
+3. **Clear Failure Points**: If lint fails, you know immediately without waiting for all tests
+4. **Parallel Execution**: Jobs within each stage run concurrently
+
+### Local Development (requires Go 1.25+)
 
 ```bash
 # Start only PostgreSQL
@@ -331,4 +405,4 @@ tests/              # Integration and stress tests
 
 ## License
 
-MIT
+Apache 2.0 - See [LICENSE](LICENSE) for details.

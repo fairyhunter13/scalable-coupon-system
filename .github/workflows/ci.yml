@@ -13,6 +13,11 @@ env:
   POSTGRES_DB: coupon_db
 
 jobs:
+  # ===========================================================================
+  # STAGE 1: Quality Gates (Parallel, No DB Required)
+  # These jobs run in parallel and must ALL pass before Stage 2 begins.
+  # ===========================================================================
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -35,24 +40,9 @@ jobs:
       - name: Verify Docker build
         run: docker build -t scalable-coupon-system:ci .
 
-  test:
-    name: Test
+  unit-tests:
+    name: Unit Tests & Coverage
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -63,79 +53,17 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Wait for PostgreSQL to be ready
+      - name: Run unit tests with coverage
         run: |
-          until pg_isready -h localhost -p 5432 -U ${{ env.POSTGRES_USER }}; do
-            echo "Waiting for PostgreSQL..."
-            sleep 2
-          done
+          go test -race -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/...
 
-      - name: Initialize database schema
+      - name: Check coverage threshold (80%)
         run: |
-          PGPASSWORD=${{ env.POSTGRES_PASSWORD }} psql -h localhost -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -f scripts/init.sql
-
-      - name: Run unit tests
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: ${{ env.POSTGRES_USER }}
-          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          DB_NAME: ${{ env.POSTGRES_DB }}
-          DB_SSL_MODE: disable
-        run: go test -v -race ./internal/...
-
-      - name: Run integration tests
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: ${{ env.POSTGRES_USER }}
-          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          DB_NAME: ${{ env.POSTGRES_DB }}
-          DB_SSL_MODE: disable
-        run: go test -v -race ./tests/integration/...
-
-      - name: Run stress tests
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: ${{ env.POSTGRES_USER }}
-          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          DB_NAME: ${{ env.POSTGRES_DB }}
-          DB_SSL_MODE: disable
-        run: go test -v -race -count=1 ./tests/stress/...
-
-      - name: Run scale stress tests (CI-only)
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: ${{ env.POSTGRES_USER }}
-          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          DB_NAME: ${{ env.POSTGRES_DB }}
-          DB_SSL_MODE: disable
-        run: go test -v -race -tags ci -count=1 ./tests/stress/... -run "TestScaleStress"
-        timeout-minutes: 5
-
-      - name: Generate coverage report
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: ${{ env.POSTGRES_USER }}
-          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          DB_NAME: ${{ env.POSTGRES_DB }}
-          DB_SSL_MODE: disable
-        run: |
-          mkdir -p coverage
-          # Use -coverpkg to measure only production code, excluding test packages
-          # This prevents CI-only test packages from diluting coverage metrics
-          go test -race -coverprofile=coverage/coverage.out -coverpkg=./internal/...,./pkg/... ./...
-
-      - name: Check coverage threshold
-        run: |
-          COVERAGE=$(go tool cover -func=coverage/coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
           echo "Total coverage: ${COVERAGE}%"
           THRESHOLD=80
           if [ "$(echo "$COVERAGE < $THRESHOLD" | bc -l)" -eq 1 ]; then
-            echo "::error::Coverage ${COVERAGE}% is below ${THRESHOLD}% threshold"
+            echo "::error::Coverage ${COVERAGE}% is below required threshold of ${THRESHOLD}%"
             exit 1
           fi
           echo "::notice::Coverage ${COVERAGE}% meets ${THRESHOLD}% threshold (target per NFR11)"
@@ -144,7 +72,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: coverage/coverage.out
+          path: coverage.out
           retention-days: 30
 
   lint:
@@ -205,10 +133,31 @@ jobs:
       - name: Run govulncheck
         run: govulncheck ./...
 
-  chaos:
-    name: Chaos Tests
+  # ===========================================================================
+  # STAGE 2: Database Tests (Parallel, DB Required)
+  # These jobs only run after ALL Stage 1 jobs pass.
+  # Includes: integration tests, stress tests, and chaos tests from Stories 6.1-6.5.
+  # ===========================================================================
+
+  integration-tests:
+    name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [build]  # Depends on build only - chaos tests use dockertest (self-contained)
+    needs: [unit-tests, lint, security]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -219,6 +168,102 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Run chaos tests (input boundary, resilience, edge cases)
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until pg_isready -h localhost -p 5432 -U ${{ env.POSTGRES_USER }}; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Initialize database schema
+        run: |
+          PGPASSWORD=${{ env.POSTGRES_PASSWORD }} psql -h localhost -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -f scripts/init.sql
+
+      - name: Run integration tests
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: ${{ env.POSTGRES_USER }}
+          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          DB_NAME: ${{ env.POSTGRES_DB }}
+          DB_SSL_MODE: disable
+        run: go test -v -race ./tests/integration/...
+
+  stress-tests:
+    name: Stress Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, lint, security]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until pg_isready -h localhost -p 5432 -U ${{ env.POSTGRES_USER }}; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Initialize database schema
+        run: |
+          PGPASSWORD=${{ env.POSTGRES_PASSWORD }} psql -h localhost -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -f scripts/init.sql
+
+      - name: Run stress tests (Flash Sale, Double Dip)
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: ${{ env.POSTGRES_USER }}
+          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          DB_NAME: ${{ env.POSTGRES_DB }}
+          DB_SSL_MODE: disable
+        run: go test -v -race -count=1 ./tests/stress/...
+
+      - name: Run scale stress tests (CI-only, Story 6.1)
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: ${{ env.POSTGRES_USER }}
+          DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          DB_NAME: ${{ env.POSTGRES_DB }}
+          DB_SSL_MODE: disable
+        run: go test -v -race -tags ci -count=1 ./tests/stress/... -run "TestScaleStress"
+        timeout-minutes: 5
+
+  chaos-tests:
+    name: Chaos Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests, lint, security]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run chaos tests (Stories 6.2-6.5)
         run: go test -v -race -tags ci -count=1 ./tests/chaos/...
         timeout-minutes: 10

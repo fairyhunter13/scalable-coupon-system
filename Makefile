@@ -28,7 +28,7 @@ define check_file_exists
 endef
 
 .PHONY: all deps fmt lint vet test cover build docker-build docker-run \
-	encrypt-requirements decrypt-requirements help security check
+	encrypt-requirements decrypt-requirements help security check version-check
 
 all: fmt lint vet security test
 
@@ -57,6 +57,10 @@ security:
 	govulncheck ./...
 
 check: lint vet security
+
+# Verify Go version consistency across go.mod, Dockerfile, and CI workflow
+version-check:
+	@./scripts/check-version-consistency.sh
 
 test:
 	@mkdir -p $(COVERAGE_DIR)
@@ -133,6 +137,7 @@ help:
 	@echo "  make vet               - Run go vet"
 	@echo "  make security          - Run security scans (gosec + govulncheck)"
 	@echo "  make check             - Run all checks (lint + vet + security)"
+	@echo "  make version-check     - Verify Go version consistency across files"
 	@echo "  make test              - Run tests with coverage"
 	@echo "  make cover             - Generate coverage HTML report"
 	@echo "  make build             - Build the application"

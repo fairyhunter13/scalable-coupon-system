@@ -98,7 +98,7 @@ go get github.com/jackc/pgx/v5/pgxpool
 ### Architectural Decisions Provided by Stack
 
 **Language & Runtime:**
-- Go 1.21+ (latest stable)
+- Go 1.25.x (current)
 - Fiber v2.52.x (production stable)
 
 **HTTP Layer:**

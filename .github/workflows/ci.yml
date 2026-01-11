@@ -43,7 +43,7 @@ jobs:
   # ===========================================================================
   # STAGE 1: Quality Gates (Parallel, No DB Required)
   # These jobs run in parallel and must ALL pass before Stage 2 begins.
-  # Stage 2 jobs have: needs: [unit-tests, lint, security]
+  # Stage 2 jobs have: needs: [unit-tests, lint, security, version-check]
   # ===========================================================================
 
   unit-tests:
@@ -149,6 +149,16 @@ jobs:
       - name: Run govulncheck
         run: govulncheck ./...
 
+  version-check:
+    name: Version Consistency Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check Go version consistency
+        run: ./scripts/check-version-consistency.sh
+
   # ===========================================================================
   # STAGE 2: Database Tests (Parallel, Docker-Compose Required)
   # These jobs only run after ALL Stage 1 jobs pass.
@@ -158,7 +168,7 @@ jobs:
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [unit-tests, lint, security]
+    needs: [unit-tests, lint, security, version-check]
 
     steps:
       - name: Checkout code
@@ -197,7 +207,7 @@ jobs:
   stress-tests:
     name: Stress Tests
     runs-on: ubuntu-latest
-    needs: [unit-tests, lint, security]
+    needs: [unit-tests, lint, security, version-check]
 
     steps:
       - name: Checkout code
@@ -237,7 +247,7 @@ jobs:
   chaos-tests:
     name: Chaos Tests
     runs-on: ubuntu-latest
-    needs: [unit-tests, lint, security]
+    needs: [unit-tests, lint, security, version-check]
 
     steps:
       - name: Checkout code

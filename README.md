@@ -2,21 +2,21 @@
 
 <!-- Build & CI -->
 [![CI](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml)
-[![Build](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Build)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ABuild)
+[![Build](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Build&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ABuild)
 
 <!-- Tests (Story 7.2 - Per-Category Badges) -->
-[![Unit Tests](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Unit%20Tests%20%26%20Coverage)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Unit+Tests+%26+Coverage%22)
-[![Integration Tests](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Integration%20Tests)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Integration+Tests%22)
-[![Stress Tests](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Stress%20Tests)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Stress+Tests%22)
-[![Chaos Tests](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Chaos%20Tests)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Chaos+Tests%22)
+[![Unit Tests](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Unit%20Tests&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Unit+Tests+%26+Coverage%22)
+[![Integration Tests](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Integration&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Integration+Tests%22)
+[![Stress Tests](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Stress&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Stress+Tests%22)
+[![Chaos Tests](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Chaos&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Chaos+Tests%22)
 
 <!-- Code Quality -->
-[![Lint](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Lint)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ALint)
+[![Lint](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Lint&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ALint)
 [![Go Report Card](https://goreportcard.com/badge/github.com/fairyhunter13/scalable-coupon-system)](https://goreportcard.com/report/github.com/fairyhunter13/scalable-coupon-system)
 [![codecov](https://codecov.io/gh/fairyhunter13/scalable-coupon-system/graph/badge.svg)](https://codecov.io/gh/fairyhunter13/scalable-coupon-system)
 
 <!-- Security -->
-[![Security](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg?event=push&job=Security)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ASecurity)
+[![Security](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Security&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ASecurity)
 
 <!-- Project Info -->
 [![Go Reference](https://pkg.go.dev/badge/github.com/fairyhunter13/scalable-coupon-system.svg)](https://pkg.go.dev/github.com/fairyhunter13/scalable-coupon-system)
@@ -125,6 +125,7 @@ make lint          # Run linter (golangci-lint)
 make vet           # Run go vet
 make security      # Run security scans (gosec + govulncheck)
 make check         # Run all checks (lint + vet + security)
+make version-check # Verify Go version consistency across files
 make test          # Run tests with coverage
 make cover         # Generate coverage HTML report
 make build         # Build the application
@@ -149,33 +150,33 @@ The CI pipeline uses a **staged quality gates architecture** to provide fast fee
 ### Pipeline Structure
 
 ```
-┌────────────────── PUSH/PR TRIGGER ──────────────────┐
-│                                                      │
-▼                                                      │
-┌────────────────────────────────────────────────────┐ │
-│       STAGE 1: Quality Gates (Parallel, ~2-3 min)  │ │
-│                                                    │ │
-│  ┌──────────────┐  ┌──────────┐  ┌─────────────┐  │ │
-│  │ unit-tests   │  │   lint   │  │  security   │  │ │
-│  │  + 80% cov   │  │ golangci │  │ gosec+vuln  │  │ │
-│  └──────────────┘  └──────────┘  └─────────────┘  │ │
-│                                                    │ │
-└────────────────────────────────────────────────────┘ │
-                         │                             │
-                   ALL MUST PASS                       │
-                         │                             │
-                         ▼                             │
-┌────────────────────────────────────────────────────┐ │
-│       STAGE 2: Database Tests (Parallel, ~5-8 min)  │ │
-│                                                    │ │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐ │ │
-│  │ integration  │  │    stress    │  │  chaos   │ │ │
-│  │    tests     │  │    tests     │  │  tests   │ │ │
-│  └──────────────┘  └──────────────┘  └──────────┘ │ │
-│                                                    │ │
-└────────────────────────────────────────────────────┘ │
-                                                      │
-└──────────────────────────────────────────────────────┘
+┌──────────────────── PUSH/PR TRIGGER ────────────────────┐
+│                                                          │
+▼                                                          │
+┌────────────────────────────────────────────────────────┐ │
+│         STAGE 1: Quality Gates (Parallel, ~2-3 min)    │ │
+│                                                        │ │
+│ ┌────────────┐ ┌────────┐ ┌──────────┐ ┌─────────────┐│ │
+│ │ unit-tests │ │  lint  │ │ security │ │version-check││ │
+│ │ + 80% cov  │ │golangci│ │gosec+vuln│ │  Go vers.   ││ │
+│ └────────────┘ └────────┘ └──────────┘ └─────────────┘│ │
+│                                                        │ │
+└────────────────────────────────────────────────────────┘ │
+                           │                               │
+                     ALL MUST PASS                         │
+                           │                               │
+                           ▼                               │
+┌────────────────────────────────────────────────────────┐ │
+│         STAGE 2: Database Tests (Parallel, ~5-8 min)   │ │
+│                                                        │ │
+│    ┌──────────────┐  ┌──────────────┐  ┌──────────┐   │ │
+│    │ integration  │  │    stress    │  │  chaos   │   │ │
+│    │    tests     │  │    tests     │  │  tests   │   │ │
+│    └──────────────┘  └──────────────┘  └──────────┘   │ │
+│                                                        │ │
+└────────────────────────────────────────────────────────┘ │
+                                                          │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ### Stage 1: Quality Gates (No Database)
@@ -187,6 +188,7 @@ Fast, parallel jobs that catch issues early:
 | `unit-tests` | Run `./internal/...` tests with race detection | **≥80% coverage** (enforced) |
 | `lint` | golangci-lint + go vet | No linting errors |
 | `security` | gosec + govulncheck | No security issues |
+| `version-check` | Verify Go version consistency | All files match (major.minor) |
 
 **Why 80% Coverage?**
 Per NFR11 requirements, unit test coverage must meet 80% threshold. This is enforced in Stage 1 to catch coverage drops early before running expensive database tests.
@@ -201,7 +203,7 @@ These jobs only run after **ALL** Stage 1 jobs pass:
 | `stress-tests` | Concurrency scenarios | Flash Sale, Double Dip, Scale tests |
 | `chaos-tests` | Resilience and edge cases | DB Resilience, Input Boundary, Transaction Edge Cases, Mixed Load |
 
-**Dependency:** All Stage 2 jobs have `needs: [unit-tests, lint, security]`
+**Dependency:** All Stage 2 jobs have `needs: [unit-tests, lint, security, version-check]`
 
 ### Benefits of Staged Pipeline
 
@@ -209,6 +211,26 @@ These jobs only run after **ALL** Stage 1 jobs pass:
 2. **Resource Efficiency**: Stage 2 tests (~5-8 min each) only run when basic quality passes
 3. **Clear Failure Points**: If lint fails, you know immediately without waiting for all tests
 4. **Parallel Execution**: Jobs within each stage run concurrently
+
+### Version Consistency
+
+The `version-check` job ensures Go version consistency across all configuration files. When updating Go version, you must update **all three files**:
+
+| File | Location | Format |
+|------|----------|--------|
+| `go.mod` | Line 3 | `go 1.XX.Y` |
+| `Dockerfile` | Line 2 | `FROM golang:1.XX-alpine` |
+| `.github/workflows/ci.yml` | `env.GO_VERSION` | `'1.XX.Y'` |
+
+**Important:** The check compares major.minor versions only (e.g., `1.25`), so patch versions can differ between files.
+
+**Local verification:**
+```bash
+# Check version consistency locally before committing
+make version-check
+```
+
+If versions mismatch, CI will fail with a clear error message showing which files need to be updated.
 
 ### Local Development (requires Go 1.25+)
 

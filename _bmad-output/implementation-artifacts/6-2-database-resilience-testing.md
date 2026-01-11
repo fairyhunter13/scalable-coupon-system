@@ -1,6 +1,6 @@
 # Story 6.2: Database Resilience Testing
 
-Status: review
+Status: done
 
 ## Story
 
@@ -330,4 +330,6 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 - Build verified: `go build -tags ci ./tests/chaos/...` passes
 - All fixes compile correctly
-- CI verification pending
+- CI verified: Chaos tests pass in GitHub Actions (Run ID: 20898250666)
+  - "Run chaos tests (database resilience & transaction edge cases)" step completed successfully
+  - Note: Coverage threshold failure (76.2% < 80%) is a pre-existing Epic 6 issue (CI-only tests don't contribute to coverage)

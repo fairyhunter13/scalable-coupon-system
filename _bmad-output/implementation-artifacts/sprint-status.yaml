@@ -70,10 +70,27 @@ development_status:
   epic-4-retrospective: done
 
   # Epic 5: CI/CD Pipeline & Production Readiness
-  epic-5: in-progress
+  epic-5: done
   5-1-github-actions-ci-workflow: done
   5-2-quality-gates-linting-and-static-analysis: done
   5-3-security-scanning: done
-  5-4-ci-pipeline-integration-and-quality-gates: review
-  5-5-readme-status-badges: review
-  epic-5-retrospective: optional
+  5-4-ci-pipeline-integration-and-quality-gates: done
+  5-5-readme-status-badges: done
+  epic-5-retrospective: done
+
+  # Epic 6: Advanced Testing & Chaos Engineering
+  epic-6: in-progress
+  6-1-scale-stress-tests: review
+  6-2-database-resilience-testing: done
+  6-3-input-boundary-testing: review
+  6-4-transaction-edge-cases: review
+  6-5-mixed-load-and-chaos-testing: review
+  epic-6-retrospective: optional
+
+  # Epic 7: CI/CD Enhancements & Visibility
+  epic-7: backlog
+  7-1-codecov-integration: backlog
+  7-2-test-category-badges: backlog
+  7-3-go-version-documentation-update: backlog
+  7-4-version-consistency-check: backlog
+  epic-7-retrospective: optional

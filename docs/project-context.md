@@ -31,7 +31,7 @@ Before finalizing any documentation, verify content against the rules in the enc
 
 | Component | Technology | Version | Rationale |
 |-----------|------------|---------|-----------|
-| Language | Go | 1.21+ | Required |
+| Language | Go | 1.25+ | Required |
 | Web Framework | **Fiber** | v2.52.x | Fastest Go framework, zero-allocation |
 | Database | PostgreSQL | 15+ | Required |
 | DB Driver | **pgx** | v5 | 30-50% faster than GORM, native PostgreSQL |

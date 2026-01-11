@@ -7,6 +7,8 @@ inputDocuments:
   - _bmad-output/planning-artifacts/architecture.md
   - project_requirements/strict requirements
   - project_requirements/Scalable_Coupon_System_Spec.md
+  - _bmad-output/implementation-artifacts/epic-3-retro-2026-01-11.md
+  - _bmad-output/implementation-artifacts/epic-5-retro-2026-01-11.md
 ---
 
 # scalable-coupon-system - Epic Breakdown
@@ -144,6 +146,21 @@ This document provides the complete epic and story breakdown for scalable-coupon
 - gosec for security scanning
 - govulncheck for vulnerability checking
 
+**From Epic 3 Retrospective - Advanced Testing Needs:**
+- Scale stress tests to 100-500 concurrent claims (beyond spec requirements)
+- Database resilience testing: connection pool exhaustion, query timeouts, connection drops
+- Input boundary testing: extreme payloads, special characters, length limits
+- Transaction edge cases: partial failures, deadlock provocation, negative stock prevention
+- Mixed load & chaos: simultaneous create/claim/get, zero-stock stampede, constraint violation storms
+- CI/CD-first testing strategy: all advanced tests run exclusively in GitHub Actions
+
+**From Epic 5 Retrospective - CI/CD Visibility Needs:**
+- Dynamic coverage badge via Codecov integration (show actual 94.7% instead of static threshold)
+- Test category badges: separate badges for unit/integration/stress test status
+- Go version documentation: update README.md and architecture.md to show Go 1.25+
+- Version consistency check: CI step to verify Go version matches across go.mod, Dockerfile, CI workflow
+- Infrastructure ready: CODECOV_TOKEN configured and validated in GitHub Secrets
+
 **From Project Requirements - API Specification:**
 - POST /api/coupons - Create coupon (201 Created)
 - POST /api/coupons/claim - Claim coupon (200/201 success, 409 duplicate, 400 no stock)
@@ -197,6 +214,20 @@ This document provides the complete epic and story breakdown for scalable-coupon
 - FR34: Pipeline runs linting (golangci-lint) and static analysis (go vet)
 - FR35: Pipeline runs security scanning (gosec, govulncheck)
 - FR36: Pipeline fails if any quality gate is not met
+
+**Epic 6: Advanced Testing & Chaos Engineering** (from Epic 3 Retrospective)
+- Extends FR23: Scale stress tests beyond 50 concurrent to 100-500
+- New: Database resilience testing (connection failures, timeouts)
+- New: Input boundary testing (extreme payloads, edge cases)
+- New: Transaction edge case testing (partial failures, deadlocks)
+- New: Mixed load chaos testing (multi-operation stress)
+- **CI-ONLY:** All tests run exclusively in GitHub Actions, not locally
+
+**Epic 7: CI/CD Enhancements & Visibility** (from Epic 5 Retrospective)
+- Extends FR31: Dynamic coverage reporting via Codecov integration
+- Extends FR30: Enhanced CI visibility with test category badges (including Epic 6 chaos tests)
+- Documentation updates for Go 1.25+ version alignment
+- CI consistency checks for version management
 
 ## Epic List
 
@@ -278,6 +309,41 @@ Maintainer has automated quality gates that verify correctness on every push/PR,
 - Automated stress tests
 - Quality gates: golangci-lint, go vet, gosec, govulncheck
 - Pipeline fails if any gate not met
+
+---
+
+### Epic 6: Advanced Testing & Chaos Engineering
+System resilience is proven through chaos engineering tests that exceed spec requirements, running exclusively in CI/CD.
+
+**Source:** Epic 3 Retrospective discovery
+**NFRs addressed:** NFR1, NFR2, NFR4, NFR5, NFR6, NFR8
+
+**Key Deliverables:**
+- Scale stress tests (100-500 concurrent claims)
+- Database resilience tests (connection pool, timeouts, drops)
+- Input boundary tests (extreme payloads, special characters)
+- Transaction edge case tests (partial failures, deadlocks)
+- Mixed load & chaos tests (multi-operation stress)
+
+**Strategy:** All tests run exclusively in GitHub Actions (CI-ONLY, not for local execution)
+
+---
+
+### Epic 7: CI/CD Enhancements & Visibility
+Maintainer has full visibility into project health through dynamic badges, Codecov integration, and consistent version management.
+
+**Source:** Epic 5 Retrospective recommendations
+**NFRs addressed:** NFR11 (enhanced coverage visibility)
+
+**Key Deliverables:**
+- Codecov integration with dynamic coverage badge (94.7%)
+- Separate test category badges (unit/integration/stress + Epic 6 chaos tests)
+- Go version documentation updates (1.25+)
+- CI version consistency check
+
+**Infrastructure Ready:**
+- CODECOV_TOKEN configured in GitHub Secrets
+- Token validated via successful test upload
 
 ---
 
@@ -1172,3 +1238,459 @@ So that **I can immediately see the health of the project at a glance**.
 **Then** separate status indicators show:
 - Flash Sale test: 50 concurrent -> 5 claims (pass/fail)
 - Double Dip test: 10 same-user -> 1 claim (pass/fail)
+
+---
+
+## Epic 6: Advanced Testing & Chaos Engineering
+
+System resilience is proven through chaos engineering tests that exceed spec requirements, running exclusively in CI/CD.
+
+**CI-ONLY:** All tests in this epic run exclusively in GitHub Actions. They are NOT intended for local execution due to resource requirements and infrastructure dependencies.
+
+### Story 6.1: Scale Stress Tests
+
+As a **maintainer**,
+I want **stress tests scaled to 100-500 concurrent claims (CI-only)**,
+So that **system resilience is proven beyond the spec requirements of 50 concurrent**.
+
+**Acceptance Criteria:**
+
+**Given** the CI pipeline runs the scale stress test job
+**When** 100 concurrent goroutines attempt to claim a coupon with stock=10
+**Then** exactly 10 claims succeed (200/201 responses)
+**And** exactly 90 claims fail (400 out of stock)
+**And** remaining_amount is exactly 0
+**And** test completes without race conditions (`-race` flag)
+
+**Given** the CI pipeline runs the scale stress test job
+**When** 200 concurrent goroutines attempt to claim a coupon with stock=20
+**Then** exactly 20 claims succeed
+**And** test completes within 60 seconds
+
+**Given** the CI pipeline runs the scale stress test job
+**When** 500 concurrent goroutines attempt to claim a coupon with stock=50
+**Then** exactly 50 claims succeed
+**And** no database connection pool exhaustion occurs
+**And** test is tagged with `//go:build ci` to prevent local execution
+
+---
+
+### Story 6.2: Database Resilience Testing
+
+As a **maintainer**,
+I want **CI-only tests for database failure scenarios (connection pool exhaustion, query timeouts, connection drops)**,
+So that **the system's behavior under database stress is validated and documented**.
+
+**Acceptance Criteria:**
+
+**Given** the CI pipeline runs the database resilience test job
+**When** all connection pool slots are exhausted (max_conns reached)
+**Then** new requests receive appropriate error responses (503 or timeout)
+**And** no goroutine leaks occur
+**And** system recovers when connections become available
+
+**Given** the CI pipeline runs the database resilience test job
+**When** a query exceeds the configured timeout (e.g., 5 seconds)
+**Then** the request is cancelled with context deadline exceeded
+**And** the transaction is rolled back properly
+**And** appropriate error response is returned to client
+
+**Given** the CI pipeline runs the database resilience test job
+**When** a database connection drops mid-transaction
+**Then** the transaction fails safely (no partial commits)
+**And** the connection is removed from the pool
+**And** subsequent requests use healthy connections
+
+**Given** the database resilience tests
+**When** I review the test files
+**Then** tests are tagged with `//go:build ci` to prevent local execution
+**And** tests document expected behavior for each failure scenario
+
+---
+
+### Story 6.3: Input Boundary Testing
+
+As a **maintainer**,
+I want **CI-only tests for extreme input scenarios (large payloads, special characters, length limits)**,
+So that **input validation and error handling is proven robust**.
+
+**Acceptance Criteria:**
+
+**Given** the CI pipeline runs the input boundary test job
+**When** a coupon name with 1000+ characters is submitted
+**Then** the request is rejected with 400 Bad Request
+**And** an appropriate validation error message is returned
+**And** no database query is executed
+
+**Given** the CI pipeline runs the input boundary test job
+**When** a coupon name contains SQL injection attempts (e.g., `'; DROP TABLE coupons;--`)
+**Then** the request is handled safely (parameterized queries)
+**And** no SQL injection occurs
+**And** request returns appropriate error or succeeds safely
+
+**Given** the CI pipeline runs the input boundary test job
+**When** a coupon name contains special characters (unicode, emojis, null bytes)
+**Then** the system handles them consistently
+**And** no crashes or panics occur
+**And** database constraints are respected
+
+**Given** the CI pipeline runs the input boundary test job
+**When** amount field contains extreme values (0, -1, MAX_INT, overflow values)
+**Then** invalid values are rejected with 400 Bad Request
+**And** valid edge cases (e.g., amount=1) are accepted
+
+**Given** the CI pipeline runs the input boundary test job
+**When** request body is malformed JSON or exceeds size limits
+**Then** appropriate 400 Bad Request is returned
+**And** no server resources are exhausted
+
+**Given** the input boundary tests
+**When** I review the test files
+**Then** tests are tagged with `//go:build ci` to prevent local execution
+
+---
+
+### Story 6.4: Transaction Edge Cases
+
+As a **maintainer**,
+I want **CI-only tests for transaction edge cases (partial failures, deadlock provocation, negative stock prevention)**,
+So that **transaction integrity is proven under adversarial conditions**.
+
+**Acceptance Criteria:**
+
+**Given** the CI pipeline runs the transaction edge case test job
+**When** a claim transaction fails after INSERT but before UPDATE
+**Then** the entire transaction is rolled back
+**And** no claim record exists in the database
+**And** remaining_amount is unchanged
+
+**Given** the CI pipeline runs the transaction edge case test job
+**When** two transactions attempt to claim the same coupon simultaneously (deadlock scenario)
+**Then** at least one transaction completes successfully
+**And** the other retries or fails gracefully
+**And** no deadlock persists beyond timeout
+
+**Given** the CI pipeline runs the transaction edge case test job
+**When** remaining_amount reaches 0 and concurrent claims attempt to decrement
+**Then** remaining_amount never becomes negative
+**And** all attempts after stock=0 return 400 out of stock
+**And** database constraint CHECK (remaining_amount >= 0) is never violated
+
+**Given** the CI pipeline runs the transaction edge case test job
+**When** a transaction is interrupted by context cancellation
+**Then** the transaction is rolled back cleanly
+**And** no partial state is committed
+**And** connection is returned to pool in healthy state
+
+**Given** the transaction edge case tests
+**When** I review the test files
+**Then** tests are tagged with `//go:build ci` to prevent local execution
+**And** each test documents the specific edge case being validated
+
+---
+
+### Story 6.5: Mixed Load & Chaos Testing
+
+As a **maintainer**,
+I want **CI-only chaos tests combining simultaneous create/claim/get operations, zero-stock stampedes, and constraint violation storms**,
+So that **system stability is proven under realistic chaotic load patterns**.
+
+**Acceptance Criteria:**
+
+**Given** the CI pipeline runs the mixed load chaos test job
+**When** 50 concurrent requests mix CREATE, CLAIM, and GET operations randomly
+**Then** all operations complete with appropriate status codes
+**And** no race conditions or data corruption occurs
+**And** database remains in consistent state after test
+
+**Given** the CI pipeline runs the zero-stock stampede test
+**When** a coupon with stock=1 receives 100 concurrent claim attempts
+**Then** exactly 1 claim succeeds
+**And** exactly 99 claims fail with 400 out of stock
+**And** no 500 errors or panics occur
+
+**Given** the CI pipeline runs the constraint violation storm test
+**When** 50 concurrent requests attempt duplicate claims (same user, same coupon)
+**Then** exactly 1 claim succeeds
+**And** exactly 49 claims fail with 409 Conflict
+**And** unique constraint is never violated
+**And** no database errors leak to client
+
+**Given** the CI pipeline runs the mixed load chaos test job
+**When** CREATE and CLAIM operations interleave for the same coupon name
+**Then** operations are serialized correctly
+**And** claims only succeed after coupon exists
+**And** no orphan claims are created
+
+**Given** the mixed load chaos tests
+**When** I review the test files
+**Then** tests are tagged with `//go:build ci` to prevent local execution
+**And** tests use randomized operation sequences for realistic chaos
+
+---
+
+### Story 6.6: Restructure CI Pipeline with Staged Quality Gates
+
+As a **maintainer**,
+I want **the CI pipeline restructured so Stage 2 tests only run after Stage 1 (unit tests with 80% coverage, lint, security) passes**,
+So that **expensive database tests don't waste resources when basic quality checks fail, and I get faster feedback on code quality issues**.
+
+**Acceptance Criteria:**
+
+**Stage 1 - Parallel Execution:**
+
+**Given** a push to any branch or a pull request
+**When** the CI workflow triggers
+**Then** three Stage 1 jobs start in parallel:
+- `unit-tests`: Runs `go test -race -coverprofile=coverage.out ./internal/...` with 80% coverage enforcement
+- `lint`: Runs `golangci-lint run ./...` and `go vet ./...`
+- `security`: Runs `gosec ./...` and `govulncheck ./...`
+**And** all three jobs run concurrently (not sequentially)
+
+**Coverage Threshold Enforcement:**
+
+**Given** the `unit-tests` job completes with coverage >= 80%
+**When** the coverage is evaluated
+**Then** the job passes successfully
+**And** the coverage percentage is displayed in the job output
+
+**Given** the `unit-tests` job completes with coverage < 80%
+**When** the coverage is evaluated
+**Then** the job **fails hard** (exit code non-zero)
+**And** an error message clearly states: "Coverage XX.X% is below required threshold of 80%"
+**And** Stage 2 jobs are blocked from running
+
+**Stage 2 - Dependent Execution (includes all Story 6.1-6.5 tests):**
+
+**Given** ALL Stage 1 jobs pass
+**When** Stage 1 completes successfully
+**Then** Stage 2 jobs begin execution in parallel:
+
+| Job | Command | Tests Included |
+|-----|---------|----------------|
+| `integration-tests` | `go test ./tests/integration/...` | API endpoint tests, concurrency tests |
+| `stress-tests` | `go test ./tests/stress/...` | Flash Sale, Double Dip, **Scale tests (6.1)** |
+| `chaos-tests` | `go test ./tests/chaos/...` | **DB Resilience (6.2)**, **Input Boundary (6.3)**, **Transaction Edge Cases (6.4)**, **Mixed Load (6.5)** |
+
+**Given** ANY Stage 1 job fails
+**When** that job reports failure
+**Then** Stage 2 jobs are **never started**
+**And** they are marked as "skipped" in the workflow
+
+**Given** the CI workflow file `.github/workflows/ci.yml`
+**When** I review Stage 2 job definitions
+**Then** all Stage 2 jobs have:
+```yaml
+needs: [unit-tests, lint, security]
+```
+
+**Test Coverage Verification:**
+
+**Given** the Stage 2 jobs execute
+**When** I verify the test execution
+**Then** these specific test files are run:
+- `tests/stress/scale_test.go` (Story 6.1)
+- `tests/chaos/db_resilience_test.go` (Story 6.2)
+- `tests/chaos/input_boundary_test.go` (Story 6.3)
+- `tests/chaos/transaction_edge_cases_test.go` (Story 6.4)
+- `tests/chaos/mixed_load_test.go` (Story 6.5)
+**And** all existing integration and stress tests continue to run
+
+**Pipeline Structure:**
+
+**Given** the complete pipeline execution
+**When** I view the GitHub Actions UI
+**Then** the staged structure is visually apparent:
+```
+┌──────────────────────────────────────────────────────────┐
+│                   STAGE 1 (parallel)                     │
+├──────────────────┬─────────────────┬─────────────────────┤
+│    unit-tests    │      lint       │      security       │
+│  (coverage≥80%)  │ (golangci-lint) │ (gosec+govulncheck) │
+└────────┬─────────┴────────┬────────┴──────────┬──────────┘
+         │                  │                   │
+         └──────────────────┼───────────────────┘
+                            │ ALL MUST PASS
+                            ▼
+┌──────────────────────────────────────────────────────────┐
+│                   STAGE 2 (parallel)                     │
+├──────────────────┬─────────────────┬─────────────────────┤
+│   integration    │     stress      │       chaos         │
+│   (API tests)    │ Flash/Double/   │ Resilience/Boundary │
+│                  │ Scale(6.1)      │ Edge(6.4)/Mixed(6.5)│
+└──────────────────┴─────────────────┴─────────────────────┘
+```
+
+**Documentation:**
+
+**Given** the README.md file
+**When** I read the "CI/CD Pipeline" section
+**Then** it documents the staged structure and 80% coverage requirement
+**And** it explains why Stage 2 depends on Stage 1
+
+---
+
+## Epic 7: CI/CD Enhancements & Visibility
+
+Maintainer has full visibility into project health through dynamic badges, Codecov integration, and consistent version management.
+
+### Story 7.1: Codecov Integration
+
+As a **maintainer**,
+I want **Codecov integration with dynamic coverage badges**,
+So that **I can see actual test coverage percentage (94.7%) instead of a static threshold badge**.
+
+**Acceptance Criteria:**
+
+**Given** the CI pipeline runs tests with coverage
+**When** tests complete successfully
+**Then** coverage report is uploaded to Codecov using CODECOV_TOKEN
+**And** Codecov processes the report without errors
+
+**Given** the Codecov integration is configured
+**When** I view the repository README
+**Then** a dynamic Codecov badge displays the actual coverage percentage
+**And** the badge links to the Codecov dashboard for this repository
+
+**Given** a PR is opened with code changes
+**When** CI runs and uploads coverage to Codecov
+**Then** Codecov posts a coverage report comment on the PR
+**And** coverage diff shows lines added/removed and impact on overall coverage
+
+**Given** the CI workflow file
+**When** I review the Codecov upload step
+**Then** it uses the official codecov/codecov-action
+**And** CODECOV_TOKEN is referenced from GitHub Secrets
+**And** coverage file path is correctly specified (coverage.out)
+
+**Given** the Codecov configuration
+**When** coverage drops below 80%
+**Then** Codecov marks the check as failed (optional quality gate)
+
+---
+
+### Story 7.2: Test Category Badges
+
+As a **developer viewing the repository**,
+I want **separate badges for unit, integration, stress, and Epic 6 chaos test status**,
+So that **I can immediately see which test categories are passing or failing**.
+
+**Note:** Badges include status indicators for Epic 6 advanced tests (scale stress, database resilience, input boundary, transaction edge cases, mixed load chaos).
+
+**Acceptance Criteria:**
+
+**Given** the README.md badge section
+**When** I view the repository
+**Then** I see separate status badges for:
+- Unit tests
+- Integration tests
+- Stress tests (Flash Sale, Double Dip)
+- Epic 6 chaos tests (Scale, Resilience, Boundary, Edge Cases, Mixed Load)
+
+**Given** the CI workflow file
+**When** I review the job structure
+**Then** test categories run as separate jobs or steps with distinct outcomes
+**And** each category can pass/fail independently
+
+**Given** the GitHub Actions workflow
+**When** unit tests pass but integration tests fail
+**Then** the unit test badge shows green/passing
+**And** the integration test badge shows red/failing
+**And** overall CI status reflects the failure
+
+**Given** the Epic 6 chaos tests are implemented
+**When** CI runs the chaos test suite
+**Then** chaos test badges reflect their pass/fail status
+**And** badges update automatically after each CI run
+
+**Given** the badge implementation
+**When** I review the README badge URLs
+**Then** badges use GitHub workflow status badges or shields.io
+**And** each badge links to the relevant CI job logs
+
+**Given** the README badge layout
+**When** I view the badges
+**Then** they are organized by category (Build, Tests, Quality, Security)
+**And** test badges are grouped together for easy scanning
+
+---
+
+### Story 7.3: Go Version Documentation Update
+
+As a **developer**,
+I want **README.md and architecture.md updated to show Go 1.25+**,
+So that **documentation accurately reflects the current Go version requirements**.
+
+**Acceptance Criteria:**
+
+**Given** the README.md file
+**When** I read the Prerequisites section
+**Then** it specifies Go 1.25+ as the minimum required version
+**And** the Go version badge displays 1.25+
+
+**Given** the architecture.md file
+**When** I read the Technology Stack section
+**Then** it specifies Go 1.25.x (updated from Go 1.21+)
+**And** any references to older Go versions are updated
+
+**Given** the go.mod file
+**When** I review the Go directive
+**Then** it shows `go 1.25` or `go 1.25.5`
+**And** this matches the documented version
+
+**Given** the Dockerfile
+**When** I review the Go version used
+**Then** it uses `golang:1.25` or `golang:1.25.5-alpine`
+**And** this matches the documented version
+
+**Given** the CI workflow file
+**When** I review the Go version in the setup step
+**Then** it uses Go 1.25.x
+**And** this matches the documented version
+
+**Given** all version references
+**When** I compare README, architecture.md, go.mod, Dockerfile, and CI workflow
+**Then** all Go version references are consistent (1.25.x)
+
+---
+
+### Story 7.4: Version Consistency Check
+
+As a **maintainer**,
+I want **a CI step that verifies Go version matches across go.mod, Dockerfile, and CI workflow**,
+So that **version drift is detected automatically and prevented**.
+
+**Acceptance Criteria:**
+
+**Given** the CI pipeline runs the version consistency check
+**When** go.mod, Dockerfile, and CI workflow all specify Go 1.25.x
+**Then** the check passes
+**And** no warnings are reported
+
+**Given** the CI pipeline runs the version consistency check
+**When** go.mod specifies Go 1.25 but Dockerfile uses Go 1.24
+**Then** the check fails
+**And** error message identifies the mismatched files
+**And** PR cannot be merged until fixed
+
+**Given** the CI pipeline runs the version consistency check
+**When** CI workflow uses a different Go version than go.mod
+**Then** the check fails
+**And** error message shows expected vs actual versions
+
+**Given** the version check implementation
+**When** I review the CI workflow
+**Then** it includes a dedicated job or step for version consistency
+**And** it extracts versions from go.mod, Dockerfile, and workflow file
+**And** it compares major.minor versions (patch can differ)
+
+**Given** the version check script
+**When** I review the implementation
+**Then** it is maintainable (shell script or Go tool)
+**And** it clearly documents which files are checked
+**And** it provides actionable error messages
+
+**Given** a new developer updates one version file
+**When** they forget to update the others
+**Then** CI catches the inconsistency before merge
+**And** the error guides them to update all files

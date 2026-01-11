@@ -45,11 +45,11 @@ func (m *mockClaimRows) Scan(dest ...any) error {
 	return nil
 }
 
-func (m *mockClaimRows) CommandTag() pgconn.CommandTag             { return pgconn.CommandTag{} }
+func (m *mockClaimRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
 func (m *mockClaimRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
-func (m *mockClaimRows) RawValues() [][]byte                       { return nil }
-func (m *mockClaimRows) Values() ([]any, error)                    { return nil, nil }
-func (m *mockClaimRows) Conn() *pgx.Conn                           { return nil }
+func (m *mockClaimRows) RawValues() [][]byte                          { return nil }
+func (m *mockClaimRows) Values() ([]any, error)                       { return nil, nil }
+func (m *mockClaimRows) Conn() *pgx.Conn                              { return nil }
 
 // mockClaimPool implements ClaimPoolInterface for testing.
 type mockClaimPool struct {

@@ -167,7 +167,7 @@ func TestDoubleDip(t *testing.T) {
 }
 
 // TestDoubleDip_ContextCancellation verifies graceful handling when context is
-// cancelled during concurrent claim operations. This ensures no goroutine leaks
+// canceled during concurrent claim operations. This ensures no goroutine leaks
 // or resource exhaustion occur under abnormal termination conditions.
 func TestDoubleDip_ContextCancellation(t *testing.T) {
 	cleanupTables(t)

@@ -7,8 +7,8 @@ run:
   # Timeout for analysis
   timeout: 5m
 
-  # Exclude test files from analysis (they have different standards)
-  tests: false
+  # Enable test file analysis (with targeted exclusions below)
+  tests: true
 
 output:
   # Output formats
@@ -75,7 +75,9 @@ linters:
     misspell:
       locale: US
 
-    # Staticcheck settings (includes gosimple checks)
+    # Staticcheck settings
+    # NOTE: In golangci-lint v2, gosimple (SA) is merged into staticcheck.
+    # AC#2 requires gosimple - it's enabled via staticcheck's SA* checks.
     staticcheck:
       # Enable all checks except ST1000 (package comments not required)
       checks:
@@ -90,6 +92,13 @@ linters:
         linters:
           - errcheck
           - unused
+
+      # Test file specific exclusions (tests have different standards)
+      - path: "_test\\.go"
+        linters:
+          - errcheck      # Test helper functions often ignore errors intentionally
+          - bodyclose     # Test HTTP clients are short-lived, body close not critical
+          - nilerr        # Test assertions handle nil differently
 
 severity:
   # Default severity for issues

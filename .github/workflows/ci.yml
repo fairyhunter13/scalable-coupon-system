@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  GO_VERSION: '1.24.11'
+  GO_VERSION: '1.25'
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
   POSTGRES_DB: coupon_db
@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15-alpine
         env:
           POSTGRES_USER: ${{ env.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
@@ -81,6 +81,7 @@ jobs:
           DB_USER: ${{ env.POSTGRES_USER }}
           DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           DB_NAME: ${{ env.POSTGRES_DB }}
+          DB_SSL_MODE: disable
         run: go test -v -race ./internal/...
 
       - name: Run integration tests
@@ -90,6 +91,7 @@ jobs:
           DB_USER: ${{ env.POSTGRES_USER }}
           DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           DB_NAME: ${{ env.POSTGRES_DB }}
+          DB_SSL_MODE: disable
         run: go test -v -race ./tests/integration/...
 
       - name: Run stress tests
@@ -99,6 +101,7 @@ jobs:
           DB_USER: ${{ env.POSTGRES_USER }}
           DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           DB_NAME: ${{ env.POSTGRES_DB }}
+          DB_SSL_MODE: disable
         run: go test -v -race -count=1 ./tests/stress/...
 
       - name: Generate coverage report
@@ -108,19 +111,20 @@ jobs:
           DB_USER: ${{ env.POSTGRES_USER }}
           DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           DB_NAME: ${{ env.POSTGRES_DB }}
+          DB_SSL_MODE: disable
         run: |
           mkdir -p coverage
           go test -race -coverprofile=coverage/coverage.out ./...
 
       - name: Check coverage threshold
         run: |
-          COVERAGE=$(go tool cover -func=coverage/coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Total coverage: $COVERAGE%"
-          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-            echo "::error::Coverage $COVERAGE% is below 80% threshold"
+          COVERAGE=$(go tool cover -func=coverage/coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Total coverage: ${COVERAGE}%"
+          if [ "$(echo "$COVERAGE < 80" | bc -l)" -eq 1 ]; then
+            echo "::error::Coverage ${COVERAGE}% is below 80% threshold"
             exit 1
           fi
-          echo "::notice::Coverage $COVERAGE% meets or exceeds 80% threshold"
+          echo "::notice::Coverage ${COVERAGE}% meets 80% threshold"
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -143,9 +147,10 @@ jobs:
           cache: true
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v7
         with:
           version: latest
+          args: --timeout=5m
 
       - name: Run go vet
         run: go vet ./...

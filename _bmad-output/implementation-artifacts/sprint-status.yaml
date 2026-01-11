@@ -75,4 +75,5 @@ development_status:
   5-2-quality-gates-linting-and-static-analysis: backlog
   5-3-security-scanning: backlog
   5-4-ci-pipeline-integration-and-quality-gates: backlog
+  5-5-readme-status-badges: backlog
   epic-5-retrospective: optional

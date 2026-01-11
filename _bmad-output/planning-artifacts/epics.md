@@ -1083,3 +1083,92 @@ gh pr checks
 gh run view --log-failed
 ```
 **And** NOT rely solely on GitHub web UI for CI/CD feedback
+
+---
+
+### Story 5.5: README Status Badges
+
+As a **developer viewing the repository**,
+I want **comprehensive status badges in the README**,
+So that **I can immediately see the health of the project at a glance**.
+
+**Acceptance Criteria:**
+
+**Given** the README.md file
+**When** I view the top of the document
+**Then** I see a comprehensive badge section with the following categories:
+
+**Build & CI Badges:**
+- CI/CD pipeline status (GitHub Actions workflow)
+- Build status (passing/failing)
+
+**Test Badges:**
+- Unit tests status
+- Integration tests status
+- Stress tests status
+- Race detection status (`-race` flag)
+- Test coverage percentage (with color coding: green >=80%, yellow >=60%, red <60%)
+
+**Code Quality Badges:**
+- Go Report Card (goreportcard.com)
+- golangci-lint status
+- go vet status
+
+**Security Badges:**
+- gosec security scan status
+- govulncheck vulnerability status
+
+**Project Info Badges:**
+- Go version (minimum required)
+- License (MIT or applicable)
+- Go Reference (pkg.go.dev documentation link)
+
+**Given** the GitHub Actions workflow
+**When** it completes successfully
+**Then** all relevant badges automatically update to reflect current status
+**And** coverage badge shows actual percentage from coverage report
+**And** badge colors reflect status (green=pass, red=fail, yellow=warning)
+
+**Given** the badge implementation
+**When** I review the configuration
+**Then** badges use a combination of:
+- GitHub's native workflow status badges for CI jobs
+- shields.io for custom badges (coverage, Go version, license)
+- goreportcard.com badge for Go code quality
+- pkg.go.dev badge for documentation
+
+**Given** the badge links
+**When** I click on any badge
+**Then** it navigates to the relevant resource:
+- CI badges -> GitHub Actions workflow runs
+- Coverage badge -> Coverage report or Codecov
+- Go Report Card -> goreportcard.com analysis page
+- Go Reference -> pkg.go.dev documentation
+- License -> LICENSE file in repository
+
+**Given** the coverage reporting
+**When** tests run in CI with `go test -coverprofile=coverage.out`
+**Then** coverage percentage is extracted and reported
+**And** coverage badge is updated via Codecov, Coveralls, or custom script
+**And** coverage threshold of 80% is enforced as quality gate
+
+**Given** the README badge section layout
+**When** I view the badges
+**Then** they are organized in a clean, readable format:
+```markdown
+# Project Name
+
+[![CI](badge-url)](link) [![Coverage](badge-url)](link) [![Go Report Card](badge-url)](link)
+[![Go Reference](badge-url)](link) [![License](badge-url)](link) [![Go Version](badge-url)](link)
+```
+
+**Given** the Go Report Card integration
+**When** the repository is public on GitHub
+**Then** goreportcard.com automatically analyzes the codebase
+**And** provides grades for: gofmt, go vet, gocyclo, golint, ineffassign, license, misspell
+
+**Given** the stress test badges
+**When** CI runs stress tests
+**Then** separate status indicators show:
+- Flash Sale test: 50 concurrent -> 5 claims (pass/fail)
+- Double Dip test: 10 same-user -> 1 claim (pass/fail)

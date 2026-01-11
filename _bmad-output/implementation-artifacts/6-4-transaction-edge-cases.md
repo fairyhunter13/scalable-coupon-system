@@ -1,6 +1,6 @@
 # Story 6.4: Transaction Edge Cases
 
-Status: review
+Status: done
 
 ## Story
 
@@ -543,9 +543,9 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 - ✅ Code compiles and passes `go vet`
 - ✅ Test file committed and pushed (commit 906347d)
-- ⚠️ CI chaos tests job skipped due to pre-existing coverage failure (76.2% < 80%)
-- ℹ️ The coverage issue is pre-existing from Epic 5/6 and NOT related to Story 6.4
-- ℹ️ Once coverage threshold is resolved, chaos tests will run automatically
+- ✅ CI run 20898383115 - All tests PASSED
+- ✅ Coverage: 95.7% (above 80% threshold)
+- ✅ All 10 transaction edge case tests verified in CI
 
 ## Change Log
 
@@ -553,3 +553,4 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 |------|-------------|
 | 2026-01-11 | Story 6.4 implementation complete - All transaction edge case tests implemented |
 | 2026-01-11 | Code review: Fixed 2 HIGH, 1 MEDIUM, 1 LOW issues. Test file staged for commit. |
+| 2026-01-11 | CI verified: All 10 tests passed, coverage 95.7%. Status → done |

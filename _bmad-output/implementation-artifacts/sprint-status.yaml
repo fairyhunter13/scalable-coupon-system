@@ -61,13 +61,13 @@ development_status:
   epic-3-retrospective: done
 
   # Epic 4: Testing & Quality Assurance
-  epic-4: in-progress
+  epic-4: done
   4-1-unit-tests-for-core-business-logic: done
   4-2-integration-tests-for-all-endpoints: done
   4-3-flash-sale-stress-test: done
   4-4-double-dip-stress-test: done
   4-5-complete-readme-with-test-instructions-and-architecture-notes: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   # Epic 5: CI/CD Pipeline & Production Readiness
   epic-5: backlog

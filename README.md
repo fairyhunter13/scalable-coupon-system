@@ -3,6 +3,7 @@
 <!-- Build & CI -->
 [![CI](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml/badge.svg)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml)
 [![Build](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Build&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3ABuild)
+[![Version Check](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Version%20Check&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Version+Consistency+Check%22)
 
 <!-- Tests (Story 7.2 - Per-Category Badges) -->
 [![Unit Tests](https://img.shields.io/github/actions/workflow/status/fairyhunter13/scalable-coupon-system/ci.yml?label=Unit%20Tests&logo=github)](https://github.com/fairyhunter13/scalable-coupon-system/actions/workflows/ci.yml?query=job%3A%22Unit+Tests+%26+Coverage%22)

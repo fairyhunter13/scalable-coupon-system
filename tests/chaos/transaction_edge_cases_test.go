@@ -12,9 +12,9 @@
 //   - Context cancellation mid-transaction (AC #4): Tests clean rollback and pool
 //     health when context is cancelled during transaction.
 //
-// IMPORTANT: These tests are tagged with "ci" build constraint and should
+// IMPORTANT: These tests are tagged with "chaos" build constraint and should
 // only run in CI environments where infrastructure is controlled.
-// Use: go test -v -race -tags ci ./tests/chaos/...
+// Use: go test -v -race -tags chaos ./tests/chaos/...
 //
 // References:
 //   - Story: 6-4-transaction-edge-cases

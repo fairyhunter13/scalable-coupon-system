@@ -8,7 +8,7 @@
 // - Interleaved create-claim operations
 //
 // These tests verify system stability under realistic chaotic load patterns.
-// Use: go test -v -race -tags ci ./tests/chaos/...
+// Use: go test -v -race -tags chaos ./tests/chaos/...
 package chaos
 
 import (

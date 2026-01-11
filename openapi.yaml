@@ -7,14 +7,16 @@ info:
     under high-concurrency scenarios.
   version: 1.0.0
   license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
 
 servers:
   - url: http://localhost:3000
     description: Local development server
 
 tags:
+  - name: Health
+    description: Health check operations
   - name: Coupons
     description: Coupon management operations (create, retrieve)
   - name: Claims
@@ -24,6 +26,38 @@ tags:
 security: []
 
 paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the API and database connectivity
+      operationId: healthCheck
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                healthy:
+                  summary: Healthy service
+                  value:
+                    status: "healthy"
+        '503':
+          description: Service unavailable - database connection failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                unhealthy:
+                  summary: Unhealthy service
+                  value:
+                    status: "unhealthy"
+                    error: "database connection failed"
+
   /api/coupons:
     post:
       summary: Create a new coupon
@@ -301,3 +335,18 @@ components:
           type: string
           description: Human-readable error message
           example: "coupon not found"
+
+    HealthResponse:
+      type: object
+      description: Health check response
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Health status (healthy/unhealthy)
+          example: "healthy"
+        error:
+          type: string
+          description: Error message when unhealthy (optional)
+          example: "database connection failed"

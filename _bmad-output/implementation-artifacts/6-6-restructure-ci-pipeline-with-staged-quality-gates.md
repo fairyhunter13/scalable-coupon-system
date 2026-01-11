@@ -1,6 +1,6 @@
 # Story 6.6: Restructure CI Pipeline with Staged Quality Gates
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -83,49 +83,49 @@ So that **expensive database tests don't waste resources when basic quality chec
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Analyze current CI structure (AC: #1, #3)
-  - [ ] 1.1: Review current `.github/workflows/ci.yml` job structure
-  - [ ] 1.2: Identify which jobs are Stage 1 (fast, no DB) vs Stage 2 (slow, DB-dependent)
-  - [ ] 1.3: Document current job dependencies and timing
+- [x] Task 1: Analyze current CI structure (AC: #1, #3)
+  - [x] 1.1: Review current `.github/workflows/ci.yml` job structure
+  - [x] 1.2: Identify which jobs are Stage 1 (fast, no DB) vs Stage 2 (slow, DB-dependent)
+  - [x] 1.3: Document current job dependencies and timing
 
-- [ ] Task 2: Restructure Stage 1 jobs (AC: #1, #2)
-  - [ ] 2.1: Create/modify `unit-tests` job - runs `go test -race ./internal/...` only
-  - [ ] 2.2: Ensure `unit-tests` generates coverage profile and checks 80% threshold
-  - [ ] 2.3: Verify `lint` job runs golangci-lint and go vet in parallel with unit-tests
-  - [ ] 2.4: Verify `security` job runs gosec and govulncheck in parallel with unit-tests
-  - [ ] 2.5: Remove any DB service dependencies from Stage 1 jobs
+- [x] Task 2: Restructure Stage 1 jobs (AC: #1, #2)
+  - [x] 2.1: Create/modify `unit-tests` job - runs `go test -race ./internal/...` only
+  - [x] 2.2: Ensure `unit-tests` generates coverage profile and checks 80% threshold
+  - [x] 2.3: Verify `lint` job runs golangci-lint and go vet in parallel with unit-tests
+  - [x] 2.4: Verify `security` job runs gosec and govulncheck in parallel with unit-tests
+  - [x] 2.5: Remove any DB service dependencies from Stage 1 jobs
 
-- [ ] Task 3: Create Stage 2 jobs with dependencies (AC: #3, #4, #5)
-  - [ ] 3.1: Create/modify `integration-tests` job with `needs: [unit-tests, lint, security]`
-  - [ ] 3.2: Create/modify `stress-tests` job with `needs: [unit-tests, lint, security]`
-  - [ ] 3.3: Modify `chaos-tests` job with `needs: [unit-tests, lint, security]`
-  - [ ] 3.4: Ensure all Stage 2 jobs have PostgreSQL service attached
-  - [ ] 3.5: Verify `-tags ci` flag used for CI-only tests (scale, chaos)
+- [x] Task 3: Create Stage 2 jobs with dependencies (AC: #3, #4, #5)
+  - [x] 3.1: Create/modify `integration-tests` job with `needs: [unit-tests, lint, security]`
+  - [x] 3.2: Create/modify `stress-tests` job with `needs: [unit-tests, lint, security]`
+  - [x] 3.3: Modify `chaos-tests` job with `needs: [unit-tests, lint, security]`
+  - [x] 3.4: Ensure all Stage 2 jobs have PostgreSQL service attached
+  - [x] 3.5: Verify `-tags ci` flag used for CI-only tests (scale, chaos)
 
-- [ ] Task 4: Remove redundant coverage step from Stage 2 (AC: #2)
-  - [ ] 4.1: Remove coverage generation from Stage 2 `test` job (if exists)
-  - [ ] 4.2: Keep only the unit-tests job responsible for coverage reporting
-  - [ ] 4.3: Ensure coverage artifact upload happens in Stage 1
+- [x] Task 4: Remove redundant coverage step from Stage 2 (AC: #2)
+  - [x] 4.1: Remove coverage generation from Stage 2 `test` job (if exists)
+  - [x] 4.2: Keep only the unit-tests job responsible for coverage reporting
+  - [x] 4.3: Ensure coverage artifact upload happens in Stage 1
 
-- [ ] Task 5: Verify existing tests still run (AC: #5)
-  - [ ] 5.1: Confirm integration tests include: `./tests/integration/...`
-  - [ ] 5.2: Confirm stress tests include: `./tests/stress/...` (Flash Sale, Double Dip, Scale)
-  - [ ] 5.3: Confirm chaos tests include: `./tests/chaos/...` (all 6.2-6.5 tests)
-  - [ ] 5.4: Run local verification of all test paths
+- [x] Task 5: Verify existing tests still run (AC: #5)
+  - [x] 5.1: Confirm integration tests include: `./tests/integration/...`
+  - [x] 5.2: Confirm stress tests include: `./tests/stress/...` (Flash Sale, Double Dip, Scale)
+  - [x] 5.3: Confirm chaos tests include: `./tests/chaos/...` (all 6.2-6.5 tests)
+  - [x] 5.4: Run local verification of all test paths
 
-- [ ] Task 6: Update README documentation (AC: #7)
-  - [ ] 6.1: Add "CI/CD Pipeline Structure" section to README.md
-  - [ ] 6.2: Document Stage 1 jobs and their purpose
-  - [ ] 6.3: Document Stage 2 jobs and their purpose
-  - [ ] 6.4: Explain 80% coverage requirement and why Stage 2 depends on Stage 1
-  - [ ] 6.5: Include pipeline visualization diagram
+- [x] Task 6: Update README documentation (AC: #7)
+  - [x] 6.1: Add "CI/CD Pipeline Structure" section to README.md
+  - [x] 6.2: Document Stage 1 jobs and their purpose
+  - [x] 6.3: Document Stage 2 jobs and their purpose
+  - [x] 6.4: Explain 80% coverage requirement and why Stage 2 depends on Stage 1
+  - [x] 6.5: Include pipeline visualization diagram
 
-- [ ] Task 7: Verify CI pipeline execution (AC: #6)
-  - [ ] 7.1: Push changes to trigger CI workflow
-  - [ ] 7.2: Use `gh run watch` to monitor execution
-  - [ ] 7.3: Verify Stage 1 jobs run in parallel
-  - [ ] 7.4: Verify Stage 2 jobs only start after all Stage 1 jobs pass
-  - [ ] 7.5: Test failure scenario: verify Stage 2 skipped when Stage 1 fails
+- [x] Task 7: Verify CI pipeline execution (AC: #6)
+  - [x] 7.1: Push changes to trigger CI workflow
+  - [x] 7.2: Use `gh run watch` to monitor execution
+  - [x] 7.3: Verify Stage 1 jobs run in parallel
+  - [x] 7.4: Verify Stage 2 jobs only start after all Stage 1 jobs pass
+  - [x] 7.5: Test failure scenario: verify Stage 2 skipped when Stage 1 fails
 
 ## Dev Notes
 
@@ -470,10 +470,31 @@ gh pr checks
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+- CI run 20898570747: All 7 jobs passed successfully
+- Coverage: 86.1% (meets 80% threshold per NFR11)
+
 ### Completion Notes List
 
+- Restructured CI pipeline into 2-stage architecture
+- Stage 1 (parallel, no DB): unit-tests, lint, security - completes in ~37-54s
+- Stage 2 (parallel, needs Stage 1): integration-tests, stress-tests, chaos-tests - completes in ~53-62s
+- Split monolithic `test` job into separate unit-tests (Stage 1) and integration/stress tests (Stage 2)
+- Updated chaos-tests dependency from `[build]` to `[unit-tests, lint, security]`
+- Added CI/CD Pipeline section to README with visualization diagram
+- 80% coverage enforcement in Stage 1 blocks Stage 2 if coverage drops
+- All Stories 6.1-6.5 tests verified running in CI
+
 ### File List
+
+- .github/workflows/ci.yml (modified - restructured pipeline)
+- README.md (modified - added CI/CD Pipeline section)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified - status updates)
+- _bmad-output/implementation-artifacts/6-6-restructure-ci-pipeline-with-staged-quality-gates.md (modified - task checkmarks, status)
+
+## Change Log
+
+- 2026-01-11: Restructured CI pipeline with staged quality gates (Story 6.6)

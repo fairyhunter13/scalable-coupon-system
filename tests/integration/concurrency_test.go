@@ -1,26 +1,25 @@
 //go:build integration
 
+// Package integration contains concurrency tests that run against the real docker-compose infrastructure.
+// These tests verify race condition handling using real HTTP requests to the API server.
 package integration
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/fairyhunter13/scalable-coupon-system/internal/repository"
-	"github.com/fairyhunter13/scalable-coupon-system/internal/service"
 )
 
 // TestConcurrentClaimLastStock tests AC4: Race Condition Prevention for Last Stock
 // Given two concurrent claim requests for the last available coupon
 // When both requests attempt to claim simultaneously
-// Then exactly one succeeds with 200/201
+// Then exactly one succeeds with 200
 // And exactly one fails with 400 (out of stock)
 // And remaining_amount is exactly 0 (not negative)
 func TestConcurrentClaimLastStock(t *testing.T) {
@@ -35,43 +34,48 @@ func TestConcurrentClaimLastStock(t *testing.T) {
 		"LAST_STOCK_TEST", 10, 1)
 	require.NoError(t, err)
 
-	// Setup service
-	couponRepo := repository.NewCouponRepository(testPool)
-	claimRepo := repository.NewClaimRepository(testPool)
-	couponService := service.NewCouponService(testPool, couponRepo, claimRepo)
-
-	// Execute: Two concurrent claims
+	// Execute: Two concurrent claims via HTTP
 	var wg sync.WaitGroup
-	results := make(chan error, 2)
+	results := make(chan int, 2) // HTTP status codes
 
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func(userID string) {
 			defer wg.Done()
-			err := couponService.ClaimCoupon(ctx, userID, "LAST_STOCK_TEST")
-			results <- err
+			resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+				"user_id":     userID,
+				"coupon_name": "LAST_STOCK_TEST",
+			})
+			if err != nil {
+				t.Logf("HTTP error for %s: %v", userID, err)
+				results <- 0
+				return
+			}
+			defer resp.Body.Close()
+			results <- resp.StatusCode
 		}(fmt.Sprintf("user_%d", i))
 	}
 
 	wg.Wait()
 	close(results)
 
-	// Verify: exactly 1 success, exactly 1 ErrNoStock
-	var successes, noStocks, otherErrors int
-	for err := range results {
-		if err == nil {
+	// Verify: exactly 1 success (200), exactly 1 out of stock (400)
+	var successes, outOfStock, other int
+	for code := range results {
+		switch code {
+		case http.StatusOK:
 			successes++
-		} else if errors.Is(err, service.ErrNoStock) {
-			noStocks++
-		} else {
-			otherErrors++
-			t.Logf("Unexpected error: %v", err)
+		case http.StatusBadRequest:
+			outOfStock++
+		default:
+			other++
+			t.Logf("Unexpected status code: %d", code)
 		}
 	}
 
-	assert.Equal(t, 1, successes, "Exactly one claim should succeed")
-	assert.Equal(t, 1, noStocks, "Exactly one claim should fail with ErrNoStock")
-	assert.Equal(t, 0, otherErrors, "No other errors should occur")
+	assert.Equal(t, 1, successes, "Exactly one claim should succeed (200)")
+	assert.Equal(t, 1, outOfStock, "Exactly one claim should fail with 400 (out of stock)")
+	assert.Equal(t, 0, other, "No other status codes should occur")
 
 	// Verify database state: remaining_amount = 0 (not negative)
 	var remainingAmount int
@@ -93,9 +97,8 @@ func TestConcurrentClaimLastStock(t *testing.T) {
 // TestConcurrentClaimsSameUser tests AC3: Unique Constraint Violation Handling
 // Given the claims table unique constraint on (user_id, coupon_name)
 // When a duplicate claim is attempted concurrently
-// Then the database constraint violation is caught
-// And the transaction is rolled back
-// And 409 Conflict is returned
+// Then exactly one succeeds with 200
+// And the rest fail with 409 Conflict
 func TestConcurrentClaimsSameUser(t *testing.T) {
 	cleanupTables(t)
 
@@ -108,43 +111,48 @@ func TestConcurrentClaimsSameUser(t *testing.T) {
 		"SAME_USER_TEST", 100, 100)
 	require.NoError(t, err)
 
-	// Setup service
-	couponRepo := repository.NewCouponRepository(testPool)
-	claimRepo := repository.NewClaimRepository(testPool)
-	couponService := service.NewCouponService(testPool, couponRepo, claimRepo)
-
-	// Execute: 10 concurrent claims by the SAME user
+	// Execute: 10 concurrent claims by the SAME user via HTTP
 	var wg sync.WaitGroup
-	results := make(chan error, 10)
+	results := make(chan int, 10) // HTTP status codes
 
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err := couponService.ClaimCoupon(ctx, "same_user", "SAME_USER_TEST")
-			results <- err
+			resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+				"user_id":     "same_user",
+				"coupon_name": "SAME_USER_TEST",
+			})
+			if err != nil {
+				t.Logf("HTTP error: %v", err)
+				results <- 0
+				return
+			}
+			defer resp.Body.Close()
+			results <- resp.StatusCode
 		}()
 	}
 
 	wg.Wait()
 	close(results)
 
-	// Verify: exactly 1 success, 9 ErrAlreadyClaimed
-	var successes, alreadyClaimed, otherErrors int
-	for err := range results {
-		if err == nil {
+	// Verify: exactly 1 success (200), 9 already claimed (409)
+	var successes, alreadyClaimed, other int
+	for code := range results {
+		switch code {
+		case http.StatusOK:
 			successes++
-		} else if errors.Is(err, service.ErrAlreadyClaimed) {
+		case http.StatusConflict:
 			alreadyClaimed++
-		} else {
-			otherErrors++
-			t.Logf("Unexpected error: %v", err)
+		default:
+			other++
+			t.Logf("Unexpected status code: %d", code)
 		}
 	}
 
-	assert.Equal(t, 1, successes, "Exactly one claim should succeed")
-	assert.Equal(t, 9, alreadyClaimed, "Nine claims should fail with ErrAlreadyClaimed")
-	assert.Equal(t, 0, otherErrors, "No other errors should occur")
+	assert.Equal(t, 1, successes, "Exactly one claim should succeed (200)")
+	assert.Equal(t, 9, alreadyClaimed, "Nine claims should fail with 409 (already claimed)")
+	assert.Equal(t, 0, other, "No other status codes should occur")
 
 	// Verify database state: exactly 1 claim
 	var claimCount int
@@ -167,7 +175,7 @@ func TestConcurrentClaimsSameUser(t *testing.T) {
 // Given the SELECT FOR UPDATE implementation
 // When multiple transactions attempt to lock the same coupon row
 // Then they are serialized (one waits for the other)
-// And no deadlocks occur under normal operation
+// And all requests with sufficient stock succeed
 func TestSelectForUpdateSerialization(t *testing.T) {
 	cleanupTables(t)
 
@@ -181,21 +189,25 @@ func TestSelectForUpdateSerialization(t *testing.T) {
 		"SERIALIZATION_TEST", concurrentRequests, concurrentRequests)
 	require.NoError(t, err)
 
-	// Setup service
-	couponRepo := repository.NewCouponRepository(testPool)
-	claimRepo := repository.NewClaimRepository(testPool)
-	couponService := service.NewCouponService(testPool, couponRepo, claimRepo)
-
-	// Execute: N concurrent claims from different users
+	// Execute: N concurrent claims from different users via HTTP
 	var wg sync.WaitGroup
-	results := make(chan error, concurrentRequests)
+	results := make(chan int, concurrentRequests)
 
 	for i := 0; i < concurrentRequests; i++ {
 		wg.Add(1)
 		go func(userID string) {
 			defer wg.Done()
-			err := couponService.ClaimCoupon(ctx, userID, "SERIALIZATION_TEST")
-			results <- err
+			resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+				"user_id":     userID,
+				"coupon_name": "SERIALIZATION_TEST",
+			})
+			if err != nil {
+				t.Logf("HTTP error for %s: %v", userID, err)
+				results <- 0
+				return
+			}
+			defer resp.Body.Close()
+			results <- resp.StatusCode
 		}(fmt.Sprintf("user_%d", i))
 	}
 
@@ -203,18 +215,18 @@ func TestSelectForUpdateSerialization(t *testing.T) {
 	close(results)
 
 	// Verify: all claims succeed (enough stock for all)
-	var successes, errs int
-	for err := range results {
-		if err == nil {
+	var successes, failures int
+	for code := range results {
+		if code == http.StatusOK {
 			successes++
 		} else {
-			errs++
-			t.Logf("Unexpected error: %v", err)
+			failures++
+			t.Logf("Unexpected status code: %d", code)
 		}
 	}
 
 	assert.Equal(t, concurrentRequests, successes, "All claims should succeed")
-	assert.Equal(t, 0, errs, "No claims should fail")
+	assert.Equal(t, 0, failures, "No claims should fail")
 
 	// Verify database state: remaining_amount = 0
 	var remainingAmount int
@@ -250,43 +262,48 @@ func TestFlashSaleScenario(t *testing.T) {
 		"FLASH_SALE", availableStock, availableStock)
 	require.NoError(t, err)
 
-	// Setup service
-	couponRepo := repository.NewCouponRepository(testPool)
-	claimRepo := repository.NewClaimRepository(testPool)
-	couponService := service.NewCouponService(testPool, couponRepo, claimRepo)
-
-	// Execute: 20 concurrent claims from different users
+	// Execute: 20 concurrent claims from different users via HTTP
 	var wg sync.WaitGroup
-	results := make(chan error, concurrentRequests)
+	results := make(chan int, concurrentRequests)
 
 	for i := 0; i < concurrentRequests; i++ {
 		wg.Add(1)
 		go func(userID string) {
 			defer wg.Done()
-			err := couponService.ClaimCoupon(ctx, userID, "FLASH_SALE")
-			results <- err
+			resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+				"user_id":     userID,
+				"coupon_name": "FLASH_SALE",
+			})
+			if err != nil {
+				t.Logf("HTTP error for %s: %v", userID, err)
+				results <- 0
+				return
+			}
+			defer resp.Body.Close()
+			results <- resp.StatusCode
 		}(fmt.Sprintf("user_%d", i))
 	}
 
 	wg.Wait()
 	close(results)
 
-	// Verify: exactly 5 successes, 15 ErrNoStock
-	var successes, noStocks, otherErrors int
-	for err := range results {
-		if err == nil {
+	// Verify: exactly 5 successes (200), 15 out of stock (400)
+	var successes, outOfStock, other int
+	for code := range results {
+		switch code {
+		case http.StatusOK:
 			successes++
-		} else if errors.Is(err, service.ErrNoStock) {
-			noStocks++
-		} else {
-			otherErrors++
-			t.Logf("Unexpected error: %v", err)
+		case http.StatusBadRequest:
+			outOfStock++
+		default:
+			other++
+			t.Logf("Unexpected status code: %d", code)
 		}
 	}
 
-	assert.Equal(t, availableStock, successes, "Exactly %d claims should succeed", availableStock)
-	assert.Equal(t, concurrentRequests-availableStock, noStocks, "Exactly %d claims should fail with ErrNoStock", concurrentRequests-availableStock)
-	assert.Equal(t, 0, otherErrors, "No other errors should occur")
+	assert.Equal(t, availableStock, successes, "Exactly %d claims should succeed (200)", availableStock)
+	assert.Equal(t, concurrentRequests-availableStock, outOfStock, "Exactly %d claims should fail with 400 (out of stock)", concurrentRequests-availableStock)
+	assert.Equal(t, 0, other, "No other status codes should occur")
 
 	// Verify database state: remaining_amount = 0 (not negative)
 	var remainingAmount int
@@ -308,7 +325,7 @@ func TestFlashSaleScenario(t *testing.T) {
 
 // TestTransactionRollbackOnFailure tests AC2: Transaction Rollback on Failure
 // Given a claim operation fails at any step
-// When an error occurs
+// When an error occurs (out of stock)
 // Then the entire transaction is rolled back
 // And no partial changes are persisted
 func TestTransactionRollbackOnFailure_OutOfStock(t *testing.T) {
@@ -323,17 +340,16 @@ func TestTransactionRollbackOnFailure_OutOfStock(t *testing.T) {
 		"ZERO_STOCK", 10, 0)
 	require.NoError(t, err)
 
-	// Setup service
-	couponRepo := repository.NewCouponRepository(testPool)
-	claimRepo := repository.NewClaimRepository(testPool)
-	couponService := service.NewCouponService(testPool, couponRepo, claimRepo)
+	// Execute: Attempt claim on zero stock via HTTP
+	resp, err := postJSON(formatURL("/api/coupons/claim"), map[string]string{
+		"user_id":     "user_001",
+		"coupon_name": "ZERO_STOCK",
+	})
+	require.NoError(t, err)
+	defer resp.Body.Close()
 
-	// Execute: Attempt claim on zero stock
-	err = couponService.ClaimCoupon(ctx, "user_001", "ZERO_STOCK")
-
-	// Verify: ErrNoStock returned
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, service.ErrNoStock), "Should return ErrNoStock")
+	// Verify: 400 Bad Request returned
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Should return 400 Bad Request for out of stock")
 
 	// Verify: No claim record created (transaction rolled back)
 	var claimCount int

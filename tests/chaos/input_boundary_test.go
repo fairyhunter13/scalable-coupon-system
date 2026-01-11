@@ -114,36 +114,36 @@ func TestCreateCoupon_LongNameBoundary(t *testing.T) {
 		name           string
 		couponNameLen  int
 		expectedStatus int
-		expectDBError  bool
+		expectRejected bool
 		description    string
 	}{
 		{
 			name:           "255_chars_at_db_limit",
 			couponNameLen:  255,
 			expectedStatus: http.StatusCreated,
-			expectDBError:  false,
+			expectRejected: false,
 			description:    "Exactly at VARCHAR(255) limit - should succeed",
 		},
 		{
-			name:           "256_chars_exceeds_db_limit",
+			name:           "256_chars_exceeds_limit",
 			couponNameLen:  256,
-			expectedStatus: http.StatusInternalServerError, // DB constraint violation
-			expectDBError:  true,
-			description:    "1 char over VARCHAR(255) limit - DB should reject",
+			expectedStatus: http.StatusBadRequest, // API validation rejects before hitting DB
+			expectRejected: true,
+			description:    "1 char over max=255 validation - API should reject",
 		},
 		{
 			name:           "1000_chars_far_exceeds_limit",
 			couponNameLen:  1000,
-			expectedStatus: http.StatusInternalServerError, // DB constraint violation
-			expectDBError:  true,
-			description:    "1000+ chars per AC#1 - DB should reject",
+			expectedStatus: http.StatusBadRequest, // API validation rejects before hitting DB
+			expectRejected: true,
+			description:    "1000+ chars per AC#1 - API should reject",
 		},
 		{
 			name:           "10000_chars_extreme",
 			couponNameLen:  10000,
-			expectedStatus: http.StatusInternalServerError, // DB constraint violation
-			expectDBError:  true,
-			description:    "Extreme length - DB should reject",
+			expectedStatus: http.StatusBadRequest, // API validation rejects before hitting DB
+			expectRejected: true,
+			description:    "Extreme length - API should reject",
 		},
 	}
 
@@ -164,7 +164,7 @@ func TestCreateCoupon_LongNameBoundary(t *testing.T) {
 				tc.expectedStatus, tc.description, resp.StatusCode)
 
 			// Verify no database entries for rejected names
-			if tc.expectDBError {
+			if tc.expectRejected {
 				// The name shouldn't exist in database
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()

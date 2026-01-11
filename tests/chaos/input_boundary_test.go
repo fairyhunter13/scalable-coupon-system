@@ -222,16 +222,17 @@ func TestGetCoupon_LongNameBoundary(t *testing.T) {
 
 func TestClaimCoupon_LongNameBoundary(t *testing.T) {
 	cleanupTables(t)
-	
 
 	testCases := []struct {
 		name          string
 		couponNameLen int
 		userIDLen     int
+		expectedStatus int
+		description   string
 	}{
-		{"long_coupon_name", 1000, 10},
-		{"long_user_id", 10, 1000},
-		{"both_long", 1000, 1000},
+		{"long_coupon_name", 1000, 10, http.StatusBadRequest, "coupon_name exceeds max=255 validation"},
+		{"long_user_id", 10, 1000, http.StatusBadRequest, "user_id exceeds max=255 validation"},
+		{"both_long", 1000, 1000, http.StatusBadRequest, "both fields exceed max=255 validation"},
 	}
 
 	for _, tc := range testCases {
@@ -248,12 +249,9 @@ func TestClaimCoupon_LongNameBoundary(t *testing.T) {
 			require.NoError(t, err)
 			defer resp.Body.Close()
 
-			// Should return 404 (not found) since coupon doesn't exist
-			// The important thing is no panic or crash
-			assert.True(t,
-				resp.StatusCode == http.StatusNotFound ||
-					resp.StatusCode == http.StatusInternalServerError,
-				"Should handle long names gracefully")
+			// Should return 400 Bad Request due to max=255 validation on user_id and coupon_name
+			assert.Equal(t, tc.expectedStatus, resp.StatusCode,
+				"Expected %d for %s, got %d", tc.expectedStatus, tc.description, resp.StatusCode)
 		})
 	}
 }

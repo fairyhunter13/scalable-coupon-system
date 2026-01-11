@@ -20,7 +20,7 @@ type CouponResponse struct {
 
 // CreateCouponRequest is the DTO for creating a coupon
 type CreateCouponRequest struct {
-	Name   string `json:"name" validate:"required,max=255"`
+	Name   string `json:"name" validate:"required,notblank,max=255"`
 	Amount *int   `json:"amount" validate:"required,gte=1"`
 }
 

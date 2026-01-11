@@ -10,13 +10,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fairyhunter13/scalable-coupon-system/internal/model"
 	"github.com/fairyhunter13/scalable-coupon-system/internal/service"
+	"github.com/fairyhunter13/scalable-coupon-system/internal/validator"
 )
 
 // mockCouponService is a mock implementation of CouponServiceInterface.
@@ -41,8 +41,8 @@ func (m *mockCouponService) GetByName(ctx context.Context, name string) (*model.
 
 func setupTestApp(mockSvc *mockCouponService) *fiber.App {
 	app := fiber.New()
-	validate := validator.New()
-	h := NewCouponHandler(mockSvc, validate)
+	v := validator.New() // Uses shared validator with custom validations
+	h := NewCouponHandler(mockSvc, v)
 	app.Post("/api/coupons", h.CreateCoupon)
 	app.Get("/api/coupons/:name", h.GetCoupon)
 	return app
@@ -378,8 +378,8 @@ func TestGetCoupon_InternalServerError(t *testing.T) {
 func TestGetCoupon_EmptyName(t *testing.T) {
 	mockSvc := &mockCouponService{}
 	app := fiber.New()
-	validate := validator.New()
-	h := NewCouponHandler(mockSvc, validate)
+	v := validator.New() // Uses shared validator with custom validations
+	h := NewCouponHandler(mockSvc, v)
 
 	// Register route that allows empty name to test validation
 	app.Get("/api/coupons/:name?", h.GetCoupon)
@@ -447,7 +447,7 @@ func TestCreateCoupon_WhitespaceOnlyName(t *testing.T) {
 	mockSvc := &mockCouponService{}
 	app := setupTestApp(mockSvc)
 
-	// Whitespace-only name - should fail validation
+	// Whitespace-only name - should fail validation with notblank validator
 	body := `{"name": "   ", "amount": 100}`
 	req := httptest.NewRequest(http.MethodPost, "/api/coupons", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -455,9 +455,13 @@ func TestCreateCoupon_WhitespaceOnlyName(t *testing.T) {
 	resp, err := app.Test(req)
 	require.NoError(t, err)
 
-	// Validator passes whitespace-only strings as valid (not empty)
-	// This documents actual behavior - service layer could add trim validation if needed
-	assert.Equal(t, fiber.StatusCreated, resp.StatusCode, "Whitespace name passes basic validation")
+	// With notblank validator, whitespace-only names are rejected
+	assert.Equal(t, fiber.StatusBadRequest, resp.StatusCode, "Whitespace-only name should be rejected")
+
+	var result map[string]string
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+	assert.Equal(t, "invalid request: name cannot be whitespace only", result["error"])
 }
 
 func TestCreateCoupon_VeryLargeAmount(t *testing.T) {

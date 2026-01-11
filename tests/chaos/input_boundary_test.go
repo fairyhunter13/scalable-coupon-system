@@ -37,10 +37,6 @@ func generateLongString(length int) string {
 	return string(b)
 }
 
-// ptrInt is a helper to create a pointer to an int.
-func ptrInt(i int) *int {
-	return &i
-}
 
 // SQL injection payloads to test parameterized query protection.
 var sqlInjectionPayloads = []string{

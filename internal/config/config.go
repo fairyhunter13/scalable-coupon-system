@@ -59,6 +59,24 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
+// WarnIfDefaultCredentials logs a warning if default database credentials are in use.
+// This should be called after loading the configuration in non-test environments.
+func (c *Config) WarnIfDefaultCredentials() []string {
+	var warnings []string
+
+	if c.DB.Password == "postgres" {
+		warnings = append(warnings, "DB_PASSWORD is using default value 'postgres' - CHANGE THIS IN PRODUCTION")
+	}
+	if c.DB.User == "postgres" {
+		warnings = append(warnings, "DB_USER is using default value 'postgres' - consider using a dedicated user in production")
+	}
+	if c.DB.SSLMode == "disable" {
+		warnings = append(warnings, "DB_SSLMODE is 'disable' - use 'require' or 'verify-full' in production")
+	}
+
+	return warnings
+}
+
 // Validate checks that all configuration values are valid.
 func (c *Config) Validate() error {
 	// Validate server port

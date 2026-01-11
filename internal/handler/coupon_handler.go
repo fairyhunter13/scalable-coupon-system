@@ -43,6 +43,9 @@ func formatValidationError(err error) string {
 				if tag == "required" {
 					return "invalid request: name is required"
 				}
+				if tag == "notblank" {
+					return "invalid request: name cannot be whitespace only"
+				}
 				if tag == "max" {
 					return "invalid request: name exceeds maximum length of 255"
 				}

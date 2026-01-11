@@ -10,12 +10,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fairyhunter13/scalable-coupon-system/internal/service"
+	"github.com/fairyhunter13/scalable-coupon-system/internal/validator"
 )
 
 // mockClaimService is a mock implementation of ClaimServiceInterface.
@@ -32,8 +32,8 @@ func (m *mockClaimService) ClaimCoupon(ctx context.Context, userID, couponName s
 
 func setupClaimTestApp(mockSvc *mockClaimService) *fiber.App {
 	app := fiber.New()
-	validate := validator.New()
-	h := NewClaimHandler(mockSvc, validate)
+	v := validator.New() // Uses shared validator with custom validations
+	h := NewClaimHandler(mockSvc, v)
 	app.Post("/api/coupons/claim", h.ClaimCoupon)
 	return app
 }

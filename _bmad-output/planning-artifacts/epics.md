@@ -118,7 +118,7 @@ This document provides the complete epic and story breakdown for scalable-coupon
 
 **From Architecture - Starter Template:**
 - Project uses Fiber v2 + pgx v5 stack (specified for Epic 1 Story 1)
-- Go 1.21+ with Fiber v2.52.x
+- Go 1.25+ with Fiber v2.52.x
 - pgxpool for connection management with prepared statement caching
 
 **From Architecture - Database Design:**

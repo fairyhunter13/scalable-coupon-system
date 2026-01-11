@@ -271,6 +271,7 @@ components:
         name:
           type: string
           description: Unique name for the coupon
+          maxLength: 255
           example: "PROMO_SUPER"
         amount:
           type: integer
@@ -319,10 +320,12 @@ components:
         user_id:
           type: string
           description: Unique identifier of the user claiming the coupon
+          maxLength: 255
           example: "user_12345"
         coupon_name:
           type: string
           description: Name of the coupon to claim
+          maxLength: 255
           example: "PROMO_SUPER"
 
     ErrorResponse:

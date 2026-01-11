@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/kelseyhightower/envconfig"
 )
@@ -46,11 +47,58 @@ type LogConfig struct {
 	Pretty bool   `envconfig:"LOG_PRETTY" default:"false"`
 }
 
-// Load parses environment variables into the Config struct.
+// Load parses environment variables into the Config struct and validates them.
 func Load() (*Config, error) {
 	var cfg Config
 	if err := envconfig.Process("", &cfg); err != nil {
 		return nil, err
 	}
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
+	}
 	return &cfg, nil
+}
+
+// Validate checks that all configuration values are valid.
+func (c *Config) Validate() error {
+	// Validate server port
+	port, err := strconv.Atoi(c.Server.Port)
+	if err != nil {
+		return fmt.Errorf("SERVER_PORT must be a valid number: %w", err)
+	}
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("SERVER_PORT must be between 1 and 65535, got %d", port)
+	}
+
+	// Validate shutdown timeout
+	if c.Server.ShutdownTimeout < 1 {
+		return fmt.Errorf("SHUTDOWN_TIMEOUT must be at least 1 second, got %d", c.Server.ShutdownTimeout)
+	}
+
+	// Validate DB port
+	if c.DB.Port < 1 || c.DB.Port > 65535 {
+		return fmt.Errorf("DB_PORT must be between 1 and 65535, got %d", c.DB.Port)
+	}
+
+	// Validate connection pool sizes
+	if c.DB.MaxConns < 1 {
+		return fmt.Errorf("DB_MAX_CONNS must be at least 1, got %d", c.DB.MaxConns)
+	}
+	if c.DB.MinConns < 0 {
+		return fmt.Errorf("DB_MIN_CONNS must be at least 0, got %d", c.DB.MinConns)
+	}
+	if c.DB.MinConns > c.DB.MaxConns {
+		return fmt.Errorf("DB_MIN_CONNS (%d) cannot exceed DB_MAX_CONNS (%d)", c.DB.MinConns, c.DB.MaxConns)
+	}
+
+	// Validate SSL mode
+	validSSLModes := map[string]bool{
+		"disable": true, "allow": true, "prefer": true,
+		"require": true, "verify-ca": true, "verify-full": true,
+	}
+	if !validSSLModes[c.DB.SSLMode] {
+		return fmt.Errorf("DB_SSLMODE must be one of: disable, allow, prefer, require, verify-ca, verify-full; got %q", c.DB.SSLMode)
+	}
+
+	return nil
 }

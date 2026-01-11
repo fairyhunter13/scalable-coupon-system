@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -40,13 +41,18 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to database")
 	}
 
-	// Initialize Fiber
+	// Initialize Fiber with production-ready configuration
 	app := fiber.New(fiber.Config{
-		AppName: "Scalable Coupon System",
+		AppName:      "Scalable Coupon System",
+		ReadTimeout:  30 * time.Second,  // Max time to read request
+		WriteTimeout: 30 * time.Second,  // Max time to write response
+		IdleTimeout:  120 * time.Second, // Max time for keep-alive connections
+		BodyLimit:    1 * 1024 * 1024,   // 1MB body limit (explicit, prevents large payloads)
 	})
 
 	// Middleware
 	app.Use(recover.New())
+	app.Use(requestid.New()) // Adds X-Request-ID header to all requests
 	app.Use(logger.New())
 
 	// Initialize validator

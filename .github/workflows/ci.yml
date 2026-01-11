@@ -21,6 +21,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -133,9 +134,12 @@ jobs:
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           go install golang.org/x/vuln/cmd/govulncheck@latest
 
-      - name: Run gosec (SARIF output)
-        run: gosec -fmt sarif -out gosec-results.sarif -stdout -verbose=text ./...
-        continue-on-error: true
+      - name: Run gosec (SARIF output for GitHub Security tab)
+        run: |
+          # Run gosec with SARIF output, capture exit code
+          gosec -fmt sarif -out gosec-results.sarif -stdout -verbose=text ./... || GOSEC_EXIT=$?
+          # Always upload SARIF results to GitHub Security
+          echo "gosec_exit=${GOSEC_EXIT:-0}" >> $GITHUB_ENV
 
       - name: Upload gosec results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
@@ -143,8 +147,12 @@ jobs:
           sarif_file: gosec-results.sarif
         if: always()
 
-      - name: Run gosec (fail on issues)
-        run: gosec ./...
+      - name: Fail if gosec found issues
+        run: |
+          if [ "${gosec_exit}" != "0" ]; then
+            echo "::error::gosec found security issues (exit code: ${gosec_exit})"
+            exit 1
+          fi
 
       - name: Run govulncheck
         run: govulncheck ./...
